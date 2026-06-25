@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>简贴</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Zen+Kaku+Gothic+New:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hljsThemeLight">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljsThemeDark" disabled>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        :root {
+            --bg:#f5f6fa;--surface:#fff;--surface-hover:#f8f9fd;--surface-alt:#eef1f8;
+            --accent:#4a6cf7;--accent-rgb:74,108,247;--accent-light:rgba(74,108,247,.07);--accent-hover:#3b5de7;--accent-focus:rgba(74,108,247,.13);
+            --text:#1e2a3a;--text-secondary:#5a6a80;--text-muted:#9aa5b8;
+            --border:#e4e8f0;--border-light:#edf0f7;
+            --shadow-sm:0 1px 3px rgba(30,42,58,.04);--shadow-md:0 4px 16px rgba(30,42,58,.07);--shadow-lg:0 12px 40px rgba(30,42,58,.10);
+            --radius-sm:8px;--radius-md:12px;--radius-lg:16px;--radius-xl:20px;
+            --font-display:'Noto Serif SC',serif;--font-body:'Zen Kaku Gothic New',sans-serif;--font-mono:'JetBrains Mono',monospace;
+            --transition:.25s cubic-bezier(.4,0,.2,1);--error:#e5484d;--error-light:rgba(229,72,77,.08);
+            --success:#30a46c;--success-light:rgba(48,164,108,.08);--pin-color:#f59e0b;--pin-light:rgba(245,158,11,.08);
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+        body{font-family:var(--font-body);font-weight:400;color:var(--text);background:var(--bg);line-height:1.7;min-height:100vh;-webkit-font-smoothing:antialiased}
+        ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
+        .container{max-width:740px;margin:0 auto;padding:0 20px}
+        .hidden{display:none!important}
+
+        /* ===== Lock ===== */
+        .lock-screen{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:var(--bg);transition:opacity .5s,visibility .5s}
+        .lock-screen.unlocked{opacity:0;visibility:hidden;pointer-events:none}
+        .lock-card{background:var(--surface);border-radius:var(--radius-xl);padding:48px 40px;text-align:center;box-shadow:var(--shadow-lg);max-width:360px;width:90%;animation:lockIn .6s ease}
+        @keyframes lockIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+        @keyframes lockShake{0%,100%{transform:none}15%,45%,75%{transform:translateX(-5px)}30%,60%,90%{transform:translateX(5px)}}
+        .lock-card.shake{animation:lockShake .45s ease}
+        .lock-icon-wrap{width:64px;height:64px;margin:0 auto 20px;background:var(--accent-light);border-radius:50%;display:flex;align-items:center;justify-content:center}
+        .lock-icon-wrap svg{width:28px;height:28px;color:var(--accent)}
+        .lock-card h2{font-family:var(--font-display);font-size:24px;font-weight:700;margin:0 0 6px}
+        .lock-subtitle{font-size:13px;color:var(--text-muted);margin:0 0 28px}
+        .lock-input-wrap{margin-bottom:20px}
+        .lock-input-wrap input{width:100%;padding:13px 16px;border:1px solid var(--border);border-radius:var(--radius-md);font-size:16px;font-family:var(--font-body);text-align:center;letter-spacing:6px;outline:none;background:var(--bg);transition:border-color var(--transition),box-shadow var(--transition)}
+        .lock-input-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-focus)}
+        .lock-btn{width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-md);font-size:15px;font-family:var(--font-body);font-weight:500;cursor:pointer;letter-spacing:8px;transition:background var(--transition),transform .15s}
+        .lock-btn:hover{background:var(--accent-hover)}.lock-btn:active{transform:scale(.98)}
+        .lock-error{font-size:13px;color:var(--error);margin:14px 0 0;opacity:0;transition:opacity var(--transition)}.lock-error.visible{opacity:1}
+
+        /* ===== Header ===== */
+        .header{border-bottom:1px solid var(--border-light);position:sticky;top:0;z-index:100;backdrop-filter:blur(16px) saturate(1.4);background:rgba(245,246,250,.85)}
+        .header-inner{display:flex;align-items:center;justify-content:space-between;height:60px}
+        .logo{font-family:var(--font-display);font-size:21px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:10px;user-select:none}
+        .logo-dot{width:9px;height:9px;border-radius:3px;background:var(--accent)}
+        .header-actions{display:flex;gap:4px}
+        .icon-btn{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:var(--radius-sm);cursor:pointer;color:var(--text-secondary);transition:all var(--transition);position:relative}
+        .icon-btn svg{width:20px;height:20px;pointer-events:none}
+        .sync-spin svg{animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+
+        /* ===== Editor ===== */
+        .editor-section{margin-top:24px;animation:fadeUp .5s ease .05s both}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+        .editor-card{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);border:1px solid var(--border-light);overflow:hidden;transition:box-shadow var(--transition)}
+        .editor-card:focus-within{box-shadow:var(--shadow-md)}
+        .editing-badge{display:none;align-items:center;gap:6px;padding:6px 14px;background:var(--pin-light);font-size:12px;font-weight:500;color:var(--pin-color);border-bottom:1px solid var(--border-light)}
+        .editing-badge.visible{display:flex}
+        .editing-badge svg{width:14px;height:14px}
+        .editing-cancel{margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;font-family:var(--font-body);padding:2px 6px;border-radius:4px}
+        .editing-cancel:hover{background:var(--surface-alt);color:var(--text)}
+
+        /* --- Toolbar Desktop --- */
+        .md-toolbar{display:flex;align-items:center;padding:6px 10px;flex-wrap:wrap;border-bottom:1px solid var(--border-light);background:var(--bg)}
+        .toolbar-cats{display:none}
+        .tool-group{display:flex;align-items:center}
+        .tg-sep{width:1px;height:20px;background:var(--border);margin:0 5px}
+        .md-btn{width:32px;height:32px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:var(--radius-sm);cursor:pointer;color:var(--text-secondary);transition:background var(--transition),color var(--transition);position:relative}
+        .md-btn svg{width:17px;height:17px;pointer-events:none}
+
+        /* hover — NO top bar/tooltip on desktop */
+        @media(hover:hover){
+            .md-btn:hover{background:var(--accent-light);color:var(--accent)}
+            .md-btn:active{transform:scale(.90)}
+            .icon-btn:hover{background:var(--accent-light);color:var(--accent)}
+            .attach-btn:hover,.fullscreen-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+            .card-action:hover{background:var(--accent-light);color:var(--accent)}
+            .card-action.danger:hover{background:var(--error-light);color:var(--error)}
+            .h-action-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+            .h-action-btn.danger:hover{border-color:var(--error);color:var(--error);background:var(--error-light)}
+        }
+        @media(hover:none){
+            .md-btn:active{background:var(--accent-light);color:var(--accent);transform:scale(.90)}
+            .icon-btn:active{background:var(--accent-light);color:var(--accent)}
+            .attach-btn:active,.fullscreen-btn:active{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+        }
+
+        /* --- Toolbar Mobile (< 560px) --- */
+        @media(max-width:560px){
+            .md-toolbar{flex-direction:column;align-items:stretch;padding:0;gap:0}
+            .toolbar-cats{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 8px;gap:6px;scrollbar-width:none}
+            .toolbar-cats::-webkit-scrollbar{display:none}
+            .cat-btn{display:flex;align-items:center;gap:5px;padding:7px 14px;flex-shrink:0;background:var(--surface);border:1px solid var(--border-light);border-radius:22px;cursor:pointer;font-size:12px;font-family:var(--font-body);font-weight:500;color:var(--text-secondary);transition:background .2s,border-color .2s,color .2s;white-space:nowrap;min-height:38px;-webkit-tap-highlight-color:transparent}
+            .cat-btn:active{transform:scale(.96)}
+            .cat-btn svg:first-child{width:16px;height:16px;flex-shrink:0}
+            .cat-chevron{width:12px;height:12px;flex-shrink:0;transition:transform .25s ease;color:var(--text-muted)}
+            .cat-btn.active{background:var(--accent-light);border-color:var(--accent);color:var(--accent);font-weight:700}
+            .cat-btn.active .cat-chevron{transform:rotate(180deg);color:var(--accent)}
+            .tg-sep{display:none}
+            .tool-group{display:none;flex-wrap:wrap;gap:6px;padding:10px 10px 12px;background:var(--surface-alt);border-top:1px solid var(--border-light)}
+            .tool-group.active{display:flex}
+            .md-btn{width:44px;height:44px;border-radius:var(--radius-sm)}
+            .md-btn svg{width:20px;height:20px}
+        }
+
+        /* tabs */
+        .edit-preview-bar{display:flex;align-items:center;padding:0 8px;border-top:1px solid var(--border-light);background:var(--bg)}
+        .ep-tab{padding:7px 16px;border:none;font-size:13px;font-family:var(--font-body);font-weight:500;cursor:pointer;background:transparent;color:var(--text-muted);border-bottom:2px solid transparent;transition:all var(--transition);-webkit-tap-highlight-color:transparent}
+        .ep-tab.active{color:var(--accent);border-bottom-color:var(--accent)}.ep-tab:hover:not(.active){color:var(--text-secondary)}
+
+        /* textarea */
+        .input-area{position:relative}
+        .input-area textarea{width:100%;min-height:170px;padding:16px 20px;border:none;outline:none;font-size:14px;font-family:var(--font-mono);line-height:1.85;color:var(--text);resize:vertical;background:transparent;tab-size:2}
+        .input-area textarea::placeholder{color:var(--text-muted);font-family:var(--font-body)}
+        .drop-overlay{position:absolute;inset:0;background:var(--accent-focus);border:2px dashed var(--accent);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--accent);font-weight:500;z-index:10;pointer-events:none;animation:fadeIn .15s ease}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+        /* images preview */
+        .input-images-preview{display:flex;gap:8px;flex-wrap:wrap;padding:0 20px 12px}
+        .preview-thumb{position:relative;width:72px;height:72px;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--border-light);transition:transform var(--transition)}.preview-thumb:hover{transform:scale(1.05)}
+        .preview-thumb img{width:100%;height:100%;object-fit:cover}
+        .preview-thumb .remove-thumb{position:absolute;top:2px;right:2px;width:18px;height:18px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity var(--transition)}
+        .preview-thumb:hover .remove-thumb{opacity:1}
+
+        /* preview pane */
+        .preview-pane{padding:16px 20px;min-height:170px;display:none}.preview-pane.visible{display:block}
+
+        /* footer */
+        .input-footer{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--border-light)}
+        .footer-left{display:flex;align-items:center;gap:14px}
+        .char-count{font-size:12px;color:var(--text-muted)}
+        .reading-time{font-size:11px;color:var(--text-muted);padding:2px 8px;background:var(--surface-alt);border-radius:4px}
+        .footer-right{display:flex;gap:8px}
+        .attach-btn,.fullscreen-btn{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;color:var(--text-muted);transition:all var(--transition);-webkit-tap-highlight-color:transparent}
+        .attach-btn svg,.fullscreen-btn svg{width:17px;height:17px;pointer-events:none}
+        .save-btn{padding:8px 28px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-family:var(--font-body);font-weight:500;cursor:pointer;transition:all var(--transition);-webkit-tap-highlight-color:transparent}
+        .save-btn:hover{background:var(--accent-hover);transform:translateY(-1px)}.save-btn:active{transform:none}
+        .save-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+        /* fullscreen */
+        .editor-section.fullscreen{position:fixed;inset:0;z-index:500;margin:0;padding:0;background:var(--surface);animation:fadeIn .2s ease}
+        .editor-section.fullscreen .editor-card{border-radius:0;border:none;height:100%;display:flex;flex-direction:column}
+        .editor-section.fullscreen .md-toolbar{flex-wrap:nowrap;overflow-x:auto}
+        .editor-section.fullscreen .input-area{flex:1}
+        .editor-section.fullscreen .input-area textarea{min-height:100%;height:100%;resize:none}
+        .editor-section.fullscreen .preview-pane{flex:1;overflow-y:auto}
+
+        /* ===== History ===== */
+        .history-header{display:flex;align-items:center;justify-content:space-between;margin:36px 0 16px;gap:12px;flex-wrap:wrap;animation:fadeUp .5s ease .15s both}
+        .history-title{font-family:var(--font-display);font-size:16px;font-weight:600;color:var(--text-secondary);display:flex;align-items:center;gap:10px}
+        .history-count{font-size:12px;color:var(--text-muted);font-family:var(--font-body);font-weight:400}
+        .history-actions{display:flex;gap:6px;align-items:center}
+        .h-action-btn{height:32px;padding:0 12px;display:inline-flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;color:var(--text-muted);font-size:12px;font-family:var(--font-body);transition:all var(--transition);white-space:nowrap;-webkit-tap-highlight-color:transparent}
+        .h-action-btn svg{width:14px;height:14px;pointer-events:none}
+
+        .search-bar{position:relative;margin-bottom:16px;animation:fadeUp .5s ease .15s both}
+        .search-bar svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none}
+        .search-bar input{width:100%;padding:10px 14px 10px 38px;border:1px solid var(--border-light);border-radius:var(--radius-md);font-size:14px;font-family:var(--font-body);color:var(--text);background:var(--surface);outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
+        .search-bar input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-focus)}.search-bar input::placeholder{color:var(--text-muted)}
+
+        .history-list{animation:fadeUp .5s ease .2s both;padding-bottom:80px}
+        .history-card{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius-lg);margin-bottom:10px;box-shadow:var(--shadow-sm);transition:box-shadow var(--transition),border-color var(--transition);animation:cardIn .35s ease both;overflow:hidden;position:relative}
+        .history-card:hover{box-shadow:var(--shadow-md);border-color:var(--border)}
+        .history-card.pinned{border-left:3px solid var(--pin-color)}
+        .history-card.pinned::after{content:'';position:absolute;top:0;right:0;border-width:0 20px 20px 0;border-style:solid;border-color:var(--pin-color) var(--surface) var(--pin-color) var(--pin-color);opacity:.2;border-radius:0 var(--radius-lg) 0 0}
+        @keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+        .card-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0;gap:8px}
+        .card-meta{display:flex;align-items:center;gap:8px;flex-shrink:1;overflow:hidden}
+        .card-mode{font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;background:var(--accent-light);color:var(--accent);flex-shrink:0}
+        .card-time{font-size:12px;color:var(--text-muted);white-space:nowrap}
+        .card-actions{display:flex;gap:1px;opacity:0;transition:opacity var(--transition);flex-shrink:0}
+        .history-card:hover .card-actions{opacity:1}
+        .card-action{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:var(--radius-sm);cursor:pointer;color:var(--text-muted);transition:all var(--transition);-webkit-tap-highlight-color:transparent}
+        .card-action.pinned-btn{color:var(--pin-color);opacity:1}
+        .card-action svg{width:15px;height:15px;pointer-events:none}
+        .card-content{padding:10px 16px 14px;font-size:14px;line-height:1.8;color:var(--text);word-break:break-word;max-height:200px;overflow:hidden;position:relative;transition:max-height .4s ease}
+        .card-content.expanded{max-height:none}
+        .card-content:not(.expanded)::after{content:'';position:absolute;bottom:0;left:0;right:0;height:48px;background:linear-gradient(transparent,var(--surface));pointer-events:none}
+        .card-expand{display:block;width:100%;padding:6px;border:none;background:transparent;font-size:12px;color:var(--accent);cursor:pointer;font-family:var(--font-body);transition:color var(--transition)}.card-expand:hover{color:var(--accent-hover)}
+        .card-images{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 14px}
+        .card-img-thumb{width:64px;height:64px;border-radius:var(--radius-sm);overflow:hidden;cursor:pointer;border:1px solid var(--border-light);transition:transform var(--transition)}.card-img-thumb:hover{transform:scale(1.05)}
+        .card-img-thumb img{width:100%;height:100%;object-fit:cover}
+        .empty-state{text-align:center;padding:60px 20px}
+        .empty-illustration{margin-bottom:16px}.empty-illustration svg{width:120px;height:100px;color:var(--border)}
+        .empty-title{font-size:15px;color:var(--text-secondary);font-weight:500;margin-bottom:6px}
+        .empty-sub{font-size:13px;color:var(--text-muted)}
+        .no-results{text-align:center;padding:40px 20px;font-size:14px;color:var(--text-muted)}
+
+        /* ===== Markdown Body ===== */
+        .markdown-body{font-family:var(--font-body);font-size:14px;line-height:1.85;color:var(--text)}
+        .markdown-body h1{font-size:22px;margin:18px 0 10px;font-family:var(--font-display);font-weight:700;padding-bottom:6px;border-bottom:1px solid var(--border-light)}
+        .markdown-body h2{font-size:18px;margin:16px 0 8px;font-family:var(--font-display);font-weight:600}
+        .markdown-body h3{font-size:15px;margin:14px 0 6px;font-family:var(--font-display);font-weight:600}
+        .markdown-body h4,.markdown-body h5,.markdown-body h6{font-size:14px;margin:12px 0 6px;font-weight:600}
+        .markdown-body p{margin:6px 0}
+        .markdown-body code{background:var(--surface-alt);padding:2px 6px;border-radius:4px;font-size:.88em;font-family:var(--font-mono);color:var(--accent-hover)}
+        .markdown-body pre{background:#f6f8fa;padding:16px;border-radius:var(--radius-sm);overflow-x:auto;margin:10px 0;border:1px solid var(--border-light)}
+        .markdown-body pre code{background:none;padding:0;color:var(--text);font-size:13px;line-height:1.6}
+        .markdown-body blockquote{border-left:3px solid var(--accent);padding:4px 0 4px 14px;color:var(--text-secondary);margin:10px 0}.markdown-body blockquote p{margin:4px 0}
+        .markdown-body img{max-width:100%;border-radius:var(--radius-sm);margin:6px 0}
+        .markdown-body ul,.markdown-body ol{padding-left:22px;margin:6px 0}.markdown-body li{margin:3px 0}
+        .markdown-body a{color:var(--accent);text-decoration:none}.markdown-body a:hover{text-decoration:underline}
+        .markdown-body hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+        .markdown-body table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+        .markdown-body table th,.markdown-body table td{border:1px solid var(--border);padding:8px 12px;text-align:left}
+        .markdown-body table th{background:var(--surface-alt);font-weight:500}
+        .markdown-body table tr:nth-child(even){background:var(--bg)}
+        .markdown-body input[type="checkbox"]{margin-right:6px;accent-color:var(--accent)}
+
+        /* ===== Modal ===== */
+        .modal-overlay{position:fixed;inset:0;z-index:1000;background:rgba(30,42,58,.3);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease}
+        .modal{background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-lg);width:90%;max-width:520px;max-height:85vh;overflow-y:auto;animation:modalIn .3s ease}
+        @keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:none}}
+        .modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 0}
+        .modal-header h2{font-family:var(--font-display);font-size:18px;font-weight:600}
+        .modal-close{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:20px;color:var(--text-muted);transition:all var(--transition)}
+        .modal-close:hover{background:var(--surface-alt);color:var(--text)}
+        .modal-body{padding:20px 24px}
+        .settings-section{margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--border-light)}.settings-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+        .section-title{font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:14px;letter-spacing:.5px}
+        .setting-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.setting-row:last-child{margin-bottom:0}
+        .setting-row label{font-size:14px;color:var(--text);display:flex;align-items:center;gap:10px;cursor:pointer}
+        .setting-row input[type="radio"]{accent-color:var(--accent);width:16px;height:16px}
+        .form-group{margin-bottom:14px}.form-group label{display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px}
+        .form-group input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:var(--font-body);color:var(--text);background:var(--bg);outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
+        .form-group input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-focus)}
+        .form-hint{font-size:12px;color:var(--text-muted);margin-top:4px}
+        .inline-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-sm);font-size:13px;font-family:var(--font-body);font-weight:500;cursor:pointer;transition:all var(--transition);margin-top:6px;-webkit-tap-highlight-color:transparent}
+        .inline-btn:hover{background:var(--accent-light)}.inline-btn.danger{color:var(--error);border-color:var(--error)}.inline-btn.danger:hover{background:var(--error-light)}
+        .status-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+        .status-dot{width:7px;height:7px;border-radius:50%;background:var(--text-muted)}.status-dot.active{background:var(--success)}
+        .status-text{font-size:13px;color:var(--text-secondary)}
+        .btn-row{display:flex;gap:8px;flex-wrap:wrap}
+        .pwd-form{margin-top:14px;padding:14px;background:var(--bg);border-radius:var(--radius-md);border:1px solid var(--border-light)}
+        .pwd-form .form-group{margin-bottom:12px}.pwd-form .form-group:last-of-type{margin-bottom:14px}
+        .pwd-form-actions{display:flex;gap:8px}
+        .pwd-msg{font-size:13px;margin-top:8px;opacity:0;transition:opacity var(--transition)}.pwd-msg.visible{opacity:1}.pwd-msg.error{color:var(--error)}.pwd-msg.success{color:var(--success)}
+        .sync-hint{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface-alt);border-radius:var(--radius-sm);font-size:13px;color:var(--text-muted);margin-top:8px}.sync-hint svg{width:16px;height:16px;flex-shrink:0}
+        .modal-footer{padding:0 24px 20px;display:flex;justify-content:flex-end;gap:10px}
+        .btn{padding:10px 24px;border:none;border-radius:var(--radius-sm);font-size:14px;font-family:var(--font-body);font-weight:500;cursor:pointer;transition:all var(--transition);-webkit-tap-highlight-color:transparent}
+        .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent-hover)}
+        .btn-ghost{background:transparent;color:var(--text-secondary);border:1px solid var(--border)}.btn-ghost:hover{background:var(--surface-alt)}
+        .btn:disabled{opacity:.4;cursor:not-allowed}
+
+        /* Lightbox */
+        .lightbox{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;cursor:zoom-out;animation:fadeIn .2s ease}
+        .lightbox img{max-width:92vw;max-height:90vh;border-radius:var(--radius-md);box-shadow:0 8px 40px rgba(0,0,0,.4)}
+
+        /* Toast */
+        .toast-container{position:fixed;bottom:24px;right:24px;z-index:5000;display:flex;flex-direction:column;gap:8px}
+        .toast{padding:12px 20px;background:var(--surface);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);border:1px solid var(--border-light);font-size:14px;color:var(--text);animation:toastIn .35s ease;display:flex;align-items:center;gap:8px}
+        .toast.error{border-left:3px solid var(--error)}.toast.success{border-left:3px solid var(--success)}
+        .toast.out{animation:toastOut .3s ease forwards}
+        @keyframes toastIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+        @keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateX(24px)}}
+
+        /* back-to-top */
+        .back-to-top{position:fixed;bottom:28px;right:28px;width:42px;height:42px;border-radius:50%;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-md);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-secondary);transition:all var(--transition);z-index:50;opacity:0;transform:translateY(10px);pointer-events:none}
+        .back-to-top.visible{opacity:1;transform:none;pointer-events:auto}
+        .back-to-top:hover{background:var(--accent);color:#fff;border-color:var(--accent)}.back-to-top svg{width:18px;height:18px;pointer-events:none}
+
+        /* ===== Mobile 通用 (< 560px) ===== */
+        @media(max-width:560px){
+            .container{padding:0 12px}
+            .header-inner{height:52px}
+            .logo{font-size:18px}
+            .editor-section{margin-top:16px}
+            .input-area textarea{min-height:140px;font-size:13px;padding:14px 14px;line-height:1.8}
+            .input-footer{flex-wrap:wrap;gap:8px;padding:10px 12px}
+            .footer-left{order:2;width:100%;justify-content:space-between}
+            .footer-right{order:1;width:100%;justify-content:flex-end}
+            .save-btn{flex:1;max-width:160px;text-align:center}
+            .history-header{margin:28px 0 12px;gap:8px}
+            .history-title{font-size:14px}
+            .card-actions{opacity:1}
+            .card-content{padding:8px 14px 12px;font-size:13px;line-height:1.75}
+            .card-header{padding:10px 14px 0}
+            .card-images{padding:0 14px 12px}
+            .lock-card{padding:32px 24px}.lock-card h2{font-size:20px}
+            .toast-container{bottom:16px;right:16px;left:16px}.toast{width:100%}
+            .back-to-top{bottom:16px;right:16px;width:38px;height:38px}
+            .modal{width:100%;max-width:none;max-height:100vh;height:100%;border-radius:0;display:flex;flex-direction:column}
+            .modal-header{padding:16px 16px 0}
+            .modal-body{flex:1;overflow-y:auto;padding:16px}
+            .modal-footer{padding:12px 16px}
+        }
+    </style>
+</head>
+<body>
+
+<!-- Lock -->
+<div id="lockScreen" class="lock-screen hidden">
+    <div class="lock-card" id="lockCard">
+        <div class="lock-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h2>简贴</h2>
+        <p class="lock-subtitle">输入密码以继续访问</p>
+        <div class="lock-input-wrap"><input type="password" id="lockPasswordInput" placeholder="请输入密码" autocomplete="off" autofocus></div>
+        <button class="lock-btn" id="lockUnlockBtn">解 锁</button>
+        <p class="lock-error" id="lockError">密码错误，请重试</p>
+    </div>
+</div>
+
+<!-- Header -->
+<header class="header">
+    <div class="container">
+        <div class="header-inner">
+            <div class="logo"><span class="logo-dot"></span>简贴</div>
+            <div class="header-actions">
+                <button class="icon-btn" id="syncBtn" title="同步"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+                <button class="icon-btn" id="settingsBtn" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- Main -->
+<main class="container" id="mainContent">
+    <section class="editor-section" id="editorSection">
+        <div class="editor-card">
+            <div class="editing-badge" id="editingBadge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <span>编辑中</span>
+                <button class="editing-cancel" id="editingCancelBtn">取消编辑</button>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="md-toolbar" id="mdToolbar">
+                <div class="toolbar-cats" id="toolbarCats">
+                    <button class="cat-btn" data-cat="outline">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 10h4"/></svg>
+                        <span>大纲</span>
+                        <svg class="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <button class="cat-btn" data-cat="format">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+                        <span>格式</span>
+                        <svg class="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <button class="cat-btn" data-cat="structure">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>
+                        <span>结构</span>
+                        <svg class="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <button class="cat-btn" data-cat="insert">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        <span>插入</span>
+                        <svg class="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                </div>
+
+                <div class="tool-group" data-tg="outline">
+                    <button class="md-btn" data-action="h1" data-tip="标题1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 12l4 6"/><path d="M21 12l-4 6"/></svg></button>
+                    <button class="md-btn" data-action="h2" data-tip="标题2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M21 18h-4c0-4 4-3 4-6 0-1.5-2-2.5-4-1"/></svg></button>
+                    <button class="md-btn" data-action="h3" data-tip="标题3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17.5 10.5c1.7-1 3.5 0 3.5 1.5a2 2 0 0 1-2 2"/><path d="M17 17.5c2 1.5 4 .3 4-1.5a2 2 0 0 0-2-2"/></svg></button>
+                </div>
+                <div class="tg-sep"></div>
+                <div class="tool-group" data-tg="format">
+                    <button class="md-btn" data-action="bold" data-tip="粗体"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg></button>
+                    <button class="md-btn" data-action="italic" data-tip="斜体"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg></button>
+                    <button class="md-btn" data-action="strikethrough" data-tip="删除线"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.3 4.9c-1.4-1.2-3.3-1.9-5.3-1.9-3.3 0-6 1.8-6 5.1 0 1.5.6 2.7 1.6 3.6"/><line x1="4" y1="12" x2="20" y2="12"/><path d="M18 12c0 3.3-2.7 6-6 6-2.2 0-4.2-1-5.4-2.6"/></svg></button>
+                </div>
+                <div class="tg-sep"></div>
+                <div class="tool-group" data-tg="structure">
+                    <button class="md-btn" data-action="quote" data-tip="引用"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z"/></svg></button>
+                    <button class="md-btn" data-action="code" data-tip="行内代码"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></button>
+                    <button class="md-btn" data-action="codeblock" data-tip="代码块"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m10 10 2 2-2 2"/><path d="m14 14 2-2-2-2"/></svg></button>
+                    <button class="md-btn" data-action="ul" data-tip="无序列表"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg></button>
+                    <button class="md-btn" data-action="ol" data-tip="有序列表"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="3" y="8" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">1</text><text x="3" y="14" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">2</text><text x="3" y="20" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">3</text></svg></button>
+                    <button class="md-btn" data-action="task" data-tip="任务列表"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m5 11 1.5-1.5"/><path d="M12 8h7"/><path d="M12 15h7"/><rect x="3" y="12" width="6" height="6" rx="1"/></svg></button>
+                </div>
+                <div class="tg-sep"></div>
+                <div class="tool-group" data-tg="insert">
+                    <button class="md-btn" data-action="link" data-tip="链接"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+                    <button class="md-btn" data-action="image" data-tip="图片"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
+                    <button class="md-btn" data-action="table" data-tip="表格"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></button>
+                    <button class="md-btn" data-action="hr" data-tip="分隔线"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/></svg></button>
+                </div>
+            </div>
+
+            <div class="edit-preview-bar">
+                <button class="ep-tab active" data-pane="edit">编辑</button>
+                <button class="ep-tab" data-pane="preview">预览</button>
+            </div>
+            <div class="input-area" id="inputArea">
+                <textarea id="contentInput" placeholder="输入 Markdown 内容…" spellcheck="false"></textarea>
+                <div class="drop-overlay hidden" id="dropOverlay">释放以添加图片</div>
+            </div>
+            <div class="preview-pane markdown-body" id="previewPane"></div>
+            <div class="input-images-preview hidden" id="inputImagesPreview"></div>
+            <div class="input-footer">
+                <div class="footer-left">
+                    <span class="char-count" id="charCount">0 字符</span>
+                    <span class="reading-time hidden" id="readingTime"></span>
+                </div>
+                <div class="footer-right">
+                    <button class="attach-btn" id="attachBtn" title="添加图片"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
+                    <button class="fullscreen-btn" id="fullscreenBtn" title="全屏编辑"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                    <button class="save-btn" id="saveBtn" title="Ctrl+Enter 保存">保存</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="history-header">
+        <span class="history-title">历史记录 <span class="history-count" id="historyCount"></span></span>
+        <div class="history-actions">
+            <button class="h-action-btn" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出</button>
+            <button class="h-action-btn danger" id="clearAllBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>清空</button>
+        </div>
+    </div>
+    <div class="search-bar" id="searchBar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="searchInput" placeholder="搜索内容…"></div>
+    <section class="history-list" id="historyList"></section>
+</main>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header"><h2>设置</h2><button class="modal-close" id="closeSettingsBtn">&times;</button></div>
+        <div class="modal-body">
+            <div class="settings-section">
+                <div class="section-title">同步模式</div>
+                <div class="setting-row"><label><input type="radio" name="syncMode" value="off"> 仅本地</label></div>
+                <div class="setting-row"><label><input type="radio" name="syncMode" value="text"> 文本同步</label></div>
+                <div class="setting-row"><label><input type="radio" name="syncMode" value="text+image"> 文本 + 图片同步</label></div>
+            </div>
+            <div class="settings-section" id="githubSection">
+                <div class="section-title">GitHub Gist</div>
+                <div class="form-group"><label>Personal Access Token</label><input type="password" id="githubTokenInput" placeholder="ghp_xxxxxxxxxxxx"><div class="form-hint">需要 gist 权限，Token 仅存储在本地</div></div>
+                <div class="form-group"><label>Gist ID（可选，留空自动创建）</label><input type="text" id="gistIdInput" placeholder="例：abc123def456"></div>
+                <div class="status-row" id="gistStatus"><span class="status-dot" id="gistStatusDot"></span><span class="status-text" id="gistStatusText">未配置</span></div>
+                <button class="inline-btn" id="testGistBtn">测试连接</button>
+            </div>
+            <div class="settings-section" id="lskySection">
+                <div class="section-title">兰空图床 (Lsky Pro)</div>
+                <div class="form-group"><label>图床地址</label><input type="text" id="lskyUrlInput" placeholder="https://image.example.com"></div>
+                <div class="form-group"><label>Token</label><input type="password" id="lskyTokenInput" placeholder="Bearer xxxxxxxx"><div class="form-hint">在图床后台 → 接口认证 中获取</div></div>
+                <div class="status-row" id="lskyStatus"><span class="status-dot" id="lskyStatusDot"></span><span class="status-text" id="lskyStatusText">未配置</span></div>
+                <button class="inline-btn" id="testLskyBtn">测试连接</button>
+            </div>
+            <div class="settings-section" id="passwordSection">
+                <div class="section-title">访问密码</div>
+                <div id="passwordSyncHint" class="sync-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>需要开启跨端同步后才能使用密码功能</span></div>
+                <div id="passwordControls" class="hidden">
+                    <div class="status-row"><span class="status-dot" id="pwdStatusDot"></span><span class="status-text" id="pwdStatusText">未设置</span></div>
+                    <div class="btn-row">
+                        <button class="inline-btn" id="setPasswordBtn">设置密码</button>
+                        <button class="inline-btn hidden" id="changePasswordBtn">修改密码</button>
+                        <button class="inline-btn danger hidden" id="removePasswordBtn">移除密码</button>
+                    </div>
+                    <div class="pwd-form hidden" id="pwdForm">
+                        <div class="form-group hidden" id="currentPwdGroup"><label>当前密码</label><input type="password" id="currentPwdInput" placeholder="输入当前密码" autocomplete="off"></div>
+                        <div class="form-group"><label id="newPwdLabel">新密码</label><input type="password" id="newPwdInput" placeholder="输入新密码" autocomplete="off"></div>
+                        <div class="form-group"><label>确认密码</label><input type="password" id="confirmPwdInput" placeholder="再次输入新密码" autocomplete="off"></div>
+                        <div class="pwd-form-actions"><button class="btn btn-primary" id="savePwdBtn" style="padding:8px 20px">确认</button><button class="btn btn-ghost" id="cancelPwdBtn" style="padding:8px 20px">取消</button></div>
+                        <p class="pwd-msg" id="pwdMsg"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-ghost" id="cancelSettingsBtn">取消</button><button class="btn btn-primary" id="saveSettingsBtn">保存设置</button></div>
+    </div>
+</div>
+
+<div id="lightbox" class="lightbox hidden"><img id="lightboxImg" src="" alt=""></div>
+<div id="toastContainer" class="toast-container"></div>
+<button class="back-to-top" id="backToTop" title="回到顶部"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg></button>
+
+<script>
+(function(){
+'use strict';
+
+// ===== Marked setup =====
+marked.setOptions({
+    highlight: function(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+            try { return hljs.highlight(code, { language: lang }).value; } catch(e) {}
+        }
+        try { return hljs.highlightAuto(code).value; } catch(e) {}
+        return code;
+    },
+    breaks: true,
+    gfm: true
+});
+
+// ===== DOM refs =====
+const $ = id => document.getElementById(id);
+const lockScreen = $('lockScreen'), lockCard = $('lockCard'), lockPasswordInput = $('lockPasswordInput'),
+      lockUnlockBtn = $('lockUnlockBtn'), lockError = $('lockError');
+const syncBtn = $('syncBtn'), settingsBtn = $('settingsBtn');
+const editorSection = $('editorSection'), editingBadge = $('editingBadge'), editingCancelBtn = $('editingCancelBtn');
+const contentInput = $('contentInput'), previewPane = $('previewPane');
+const charCount = $('charCount'), readingTime = $('readingTime');
+const saveBtn = $('saveBtn'), attachBtn = $('attachBtn'), fullscreenBtn = $('fullscreenBtn');
+const inputArea = $('inputArea'), dropOverlay = $('dropOverlay'), inputImagesPreview = $('inputImagesPreview');
+const historyList = $('historyList'), historyCount = $('historyCount');
+const searchInput = $('searchInput');
+const exportBtn = $('exportBtn'), clearAllBtn = $('clearAllBtn');
+const settingsModal = $('settingsModal'), closeSettingsBtn = $('closeSettingsBtn'),
+      cancelSettingsBtn = $('cancelSettingsBtn'), saveSettingsBtn = $('saveSettingsBtn');
+const lightbox = $('lightbox'), lightboxImg = $('lightboxImg');
+const toastContainer = $('toastContainer');
+const backToTop = $('backToTop');
+
+// ===== State =====
+let notes = JSON.parse(localStorage.getItem('jian_notes') || '[]');
+let editingId = null;
+let pendingImages = [];
+let settings = JSON.parse(localStorage.getItem('jian_settings') || '{"syncMode":"off","githubToken":"","gistId":"","lskyUrl":"","lskyToken":"","password":""}');
+let currentFilter = '';
+
+// ===== Utils =====
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+function toast(msg, type) {
+    const t = document.createElement('div');
+    t.className = 'toast ' + (type || '');
+    t.textContent = msg;
+    toastContainer.appendChild(t);
+    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 2500);
+}
+
+function save() {
+    localStorage.setItem('jian_notes', JSON.stringify(notes));
+    localStorage.setItem('jian_settings', JSON.stringify(settings));
+}
+
+function fmtTime(ts) {
+    const d = new Date(ts);
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function renderMd(text) {
+    try { return marked.parse(text || ''); } catch(e) { return '<p>' + escHtml(text) + '</p>'; }
+}
+
+function calcReadingTime(text) {
+    if (!text) return 0;
+    const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+    const words = text.replace(/[\u4e00-\u9fff]/g, '').trim().split(/\s+/).filter(Boolean).length;
+    return Math.max(1, Math.ceil((cjk + words * 0.5) / 300));
+}
+
+// ===== Lock =====
+function initLock() {
+    if (settings.syncMode !== 'off' && settings.password) {
+        lockScreen.classList.remove('hidden');
+        lockPasswordInput.focus();
+    } else {
+        lockScreen.classList.add('hidden');
+    }
+}
+
+function tryUnlock() {
+    if (lockPasswordInput.value === settings.password) {
+        lockScreen.classList.add('unlocked');
+    } else {
+        lockError.classList.add('visible');
+        lockCard.classList.add('shake');
+        lockPasswordInput.value = '';
+        lockPasswordInput.focus();
+        setTimeout(() => lockCard.classList.remove('shake'), 500);
+    }
+}
+
+lockUnlockBtn.addEventListener('click', tryUnlock);
+lockPasswordInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); lockError.classList.remove('visible'); });
+
+// ===== Editor Tabs =====
+document.querySelectorAll('.ep-tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+        document.querySelectorAll('.ep-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        const pane = this.dataset.pane;
+        if (pane === 'preview') {
+            previewPane.innerHTML = renderMd(contentInput.value);
+            previewPane.classList.add('visible');
+            inputArea.style.display = 'none';
+            inputImagesPreview.classList.add('hidden');
+        } else {
+            previewPane.classList.remove('visible');
+            inputArea.style.display = '';
+            if (pendingImages.length) inputImagesPreview.classList.remove('hidden');
+            contentInput.focus();
+        }
+    });
+});
+
+// ===== Toolbar =====
+document.querySelectorAll('.md-btn[data-action]').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const ta = contentInput;
+        ta.focus();
+        const s = ta.selectionStart, en = ta.selectionEnd, sel = ta.value.substring(s, en);
+        const action = this.dataset.action;
+        const map = {
+            h1: ['# ', ''],
+            h2: ['## ', ''],
+            h3: ['### ', ''],
+            bold: ['**', '**'],
+            italic: ['*', '*'],
+            strikethrough: ['~~', '~~'],
+            quote: ['> ', ''],
+            code: ['`', '`'],
+            codeblock: ['```\n', '\n```'],
+            ul: ['- ', ''],
+            ol: ['1. ', ''],
+            task: ['- [ ] ', ''],
+            link: ['[', '](url)'],
+            image: ['![', '](url)'],
+            table: ['| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n| ', ' |  |  |'],
+            hr: ['\n---\n', '']
+        };
+        const [pre, post] = map[action] || ['', ''];
+        ta.value = ta.value.substring(0, s) + pre + sel + post + ta.value.substring(en);
+        const newPos = s + pre.length + sel.length;
+        ta.setSelectionRange(sel ? newPos : s + pre.length, newPos);
+        ta.dispatchEvent(new Event('input'));
+    });
+});
+
+// ===== Mobile toolbar categories =====
+document.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const cat = this.dataset.cat;
+        const isActive = this.classList.contains('active');
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tool-group').forEach(g => g.classList.remove('active'));
+        if (!isActive) {
+            this.classList.add('active');
+            const tg = document.querySelector('.tool-group[data-tg="' + cat + '"]');
+            if (tg) tg.classList.add('active');
+        }
+    });
+});
+
+// ===== Char count / reading time =====
+contentInput.addEventListener('input', function() {
+    const len = this.value.length;
+    charCount.textContent = len + ' 字符';
+    if (len > 50) {
+        readingTime.textContent = '约 ' + calcReadingTime(this.value) + ' 分钟';
+        readingTime.classList.remove('hidden');
+    } else {
+        readingTime.classList.add('hidden');
+    }
+});
+
+// ===== Save note =====
+function doSave() {
+    const text = contentInput.value.trim();
+    if (!text && pendingImages.length === 0) { toast('请输入内容', 'error'); return; }
+
+    if (editingId) {
+        const idx = notes.findIndex(n => n.id === editingId);
+        if (idx >= 0) {
+            notes[idx].content = text;
+            notes[idx].images = [...(notes[idx].images || []), ...pendingImages];
+            notes[idx].updatedAt = Date.now();
+        }
+        editingId = null;
+        editingBadge.classList.remove('visible');
+    } else {
+        notes.unshift({
+            id: uid(),
+            content: text,
+            images: [...pendingImages],
+            pinned: false,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+        });
+    }
+
+    contentInput.value = '';
+    pendingImages = [];
+    inputImagesPreview.innerHTML = '';
+    inputImagesPreview.classList.add('hidden');
+    charCount.textContent = '0 字符';
+    readingTime.classList.add('hidden');
+    save();
+    renderHistory();
+    toast('保存成功', 'success');
+}
+
+saveBtn.addEventListener('click', doSave);
+
+// Ctrl+Enter to save
+contentInput.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); doSave(); }
+});
+
+// ===== Editing badge =====
+editingCancelBtn.addEventListener('click', function() {
+    editingId = null;
+    contentInput.value = '';
+    pendingImages = [];
+    inputImagesPreview.innerHTML = '';
+    inputImagesPreview.classList.add('hidden');
+    editingBadge.classList.remove('visible');
+    charCount.textContent = '0 字符';
+    readingTime.classList.add('hidden');
+});
+
+// ===== History render =====
+function renderHistory() {
+    const q = (searchInput.value || '').trim().toLowerCase();
+    let list = [...notes].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updatedAt - a.updatedAt);
+
+    if (q) {
+        list = list.filter(n => n.content.toLowerCase().includes(q));
+    }
+
+    historyCount.textContent = '(' + notes.length + ')';
+
+    if (list.length === 0) {
+        historyList.innerHTML = q
+            ? '<div class="no-results">没有找到匹配的记录</div>'
+            : '<div class="empty-state"><div class="empty-illustration"><svg viewBox="0 0 120 100" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="20" y="10" width="80" height="80" rx="12"/><line x1="35" y1="32" x2="85" y2="32"/><line x1="35" y1="48" x2="75" y2="48"/><line x1="35" y1="64" x2="60" y2="64"/></svg></div><div class="empty-title">暂无记录</div><div class="empty-sub">在上方编辑器中开始记录吧</div></div>';
+        return;
+    }
+
+    historyList.innerHTML = '';
+    list.forEach((note, i) => {
+        const card = document.createElement('div');
+        card.className = 'history-card' + (note.pinned ? ' pinned' : '');
+        card.style.animationDelay = (i * 0.03) + 's';
+
+        const preview = note.content.length > 300 ? note.content.substring(0, 300) + '…' : note.content;
+        const hasMore = note.content.length > 300;
+
+        let imgsHtml = '';
+        if (note.images && note.images.length) {
+            imgsHtml = '<div class="card-images">' + note.images.map(img =>
+                '<div class="card-img-thumb" data-src="' + escHtml(img) + '"><img src="' + escHtml(img) + '" alt=""></div>'
+            ).join('') + '</div>';
+        }
+
+        card.innerHTML =
+            '<div class="card-header"><div class="card-meta"><span class="card-mode">文本</span><span class="card-time">' + fmtTime(note.updatedAt) + '</span></div>' +
+            '<div class="card-actions">' +
+                '<button class="card-action pin-btn" data-id="' + note.id + '" title="' + (note.pinned ? '取消置顶' : '置顶') + '">' +
+                    '<svg viewBox="0 0 24 24" fill="' + (note.pinned ? 'var(--pin-color)' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"/></svg>' +
+                '</button>' +
+                '<button class="card-action edit-btn" data-id="' + note.id + '" title="编辑">' +
+                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+                '</button>' +
+                '<button class="card-action copy-btn" data-id="' + note.id + '" title="复制">' +
+                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
+                '</button>' +
+                '<button class="card-action danger delete-btn" data-id="' + note.id + '" title="删除">' +
+                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
+                '</button>' +
+            '</div></div>' +
+            '<div class="card-content markdown-body">' + renderMd(preview) + '</div>' +
+            (hasMore ? '<button class="card-expand expand-btn" data-id="' + note.id + '">展开全文</button>' : '') +
+            imgsHtml;
+
+        historyList.appendChild(card);
+    });
+
+    // Bind events via delegation
+    bindHistoryEvents();
+}
+
+function bindHistoryEvents() {
+    // Use event delegation on historyList
+    historyList.onclick = function(e) {
+        const target = e.target.closest('[data-id]');
+        if (!target) return;
+        const id = target.dataset.id;
+
+        if (target.classList.contains('pin-btn')) {
+            const n = notes.find(n => n.id === id);
+            if (n) { n.pinned = !n.pinned; save(); renderHistory(); }
+            return;
+        }
+
+        if (target.classList.contains('edit-btn')) {
+            const n = notes.find(n => n.id === id);
+            if (n) {
+                editingId = id;
+                contentInput.value = n.content;
+                editingBadge.classList.add('visible');
+                contentInput.dispatchEvent(new Event('input'));
+                contentInput.focus();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                // Switch to edit tab
+                document.querySelectorAll('.ep-tab').forEach(t => t.classList.remove('active'));
+                document.querySelector('.ep-tab[data-pane="edit"]').classList.add('active');
+                previewPane.classList.remove('visible');
+                inputArea.style.display = '';
+            }
+            return;
+        }
+
+        if (target.classList.contains('copy-btn')) {
+            const n = notes.find(n => n.id === id);
+            if (n) {
+                navigator.clipboard.writeText(n.content).then(() => toast('已复制到剪贴板', 'success')).catch(() => toast('复制失败', 'error'));
+            }
+            return;
+        }
+
+        if (target.classList.contains('delete-btn')) {
+            if (confirm('确定删除这条记录？')) {
+                notes = notes.filter(n => n.id !== id);
+                if (editingId === id) {
+                    editingId = null;
+                    contentInput.value = '';
+                    editingBadge.classList.remove('visible');
+                }
+                save();
+                renderHistory();
+                toast('已删除', 'success');
+            }
+            return;
+        }
+
+        if (target.classList.contains('expand-btn')) {
+            const card = target.closest('.history-card');
+            const content = card.querySelector('.card-content');
+            const n = notes.find(n => n.id === id);
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                content.innerHTML = renderMd(n.content.substring(0, 300) + '…');
+                target.textContent = '展开全文';
+            } else {
+                content.classList.add('expanded');
+                content.innerHTML = renderMd(n.content);
+                target.textContent = '收起';
+            }
+            return;
+        }
+
+        // Image thumb
+        const thumb = target.closest('.card-img-thumb');
+        if (thumb) {
+            lightboxImg.src = thumb.dataset.src;
+            lightbox.classList.remove('hidden');
+        }
+    };
+}
+
+// ===== Lightbox =====
+lightbox.addEventListener('click', function() { this.classList.add('hidden'); });
+
+// ===== Search =====
+searchInput.addEventListener('input', renderHistory);
+
+// ===== Export =====
+exportBtn.addEventListener('click', function() {
+    if (notes.length === 0) { toast('没有可导出的记录', 'error'); return; }
+    const data = notes.map(n => ({
+        content: n.content,
+        images: n.images || [],
+        pinned: n.pinned,
+        createdAt: n.createdAt,
+        updatedAt: n.updatedAt
+    }));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'jian-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('导出成功', 'success');
+});
+
+// ===== Clear All =====
+clearAllBtn.addEventListener('click', function() {
+    if (notes.length === 0) { toast('没有可清空的记录', 'error'); return; }
+    if (confirm('确定要清空所有记录吗？此操作不可恢复！')) {
+        notes = [];
+        editingId = null;
+        contentInput.value = '';
+        editingBadge.classList.remove('visible');
+        save();
+        renderHistory();
+        toast('已清空所有记录', 'success');
+    }
+});
+
+// ===== Settings Modal =====
+function openSettings() {
+    settingsModal.classList.remove('hidden');
+    // Populate current values
+    const radios = document.querySelectorAll('input[name="syncMode"]');
+    radios.forEach(r => { r.checked = r.value === settings.syncMode; });
+    $('githubTokenInput').value = settings.githubToken || '';
+    $('gistIdInput').value = settings.gistId || '';
+    $('lskyUrlInput').value = settings.lskyUrl || '';
+    $('lskyTokenInput').value = settings.lskyToken || '';
+    updateSettingsUI();
+}
+
+function closeSettings() {
+    settingsModal.classList.add('hidden');
+}
+
+function updateSettingsUI() {
+    const mode = document.querySelector('input[name="syncMode"]:checked').value;
+    const ghSection = $('githubSection');
+    const lskySection = $('lskySection');
+    const pwdSection = $('passwordSection');
+    const pwdHint = $('passwordSyncHint');
+    const pwdControls = $('passwordControls');
+
+    if (mode === 'off') {
+        ghSection.classList.add('hidden');
+        lskySection.classList.add('hidden');
+    } else {
+        ghSection.classList.remove('hidden');
+        if (mode === 'text+image') lskySection.classList.remove('hidden');
+        else lskySection.classList.add('hidden');
+    }
+
+    if (mode !== 'off') {
+        pwdHint.classList.add('hidden');
+        pwdControls.classList.remove('hidden');
+        updatePasswordUI();
+    } else {
+        pwdHint.classList.remove('hidden');
+        pwdControls.classList.add('hidden');
+    }
+}
+
+function updatePasswordUI() {
+    const hasPwd = !!settings.password;
+    $('pwdStatusDot').classList.toggle('active', hasPwd);
+    $('pwdStatusText').textContent = hasPwd ? '已设置' : '未设置';
+    $('setPasswordBtn').classList.toggle('hidden', hasPwd);
+    $('changePasswordBtn').classList.toggle('hidden', !hasPwd);
+    $('removePasswordBtn').classList.toggle('hidden', !hasPwd);
+    $('pwdForm').classList.add('hidden');
+}
+
+settingsBtn.addEventListener('click', openSettings);
+closeSettingsBtn.addEventListener('click', closeSettings);
+cancelSettingsBtn.addEventListener('click', closeSettings);
+
+document.querySelectorAll('input[name="syncMode"]').forEach(r => {
+    r.addEventListener('change', updateSettingsUI);
+});
+
+saveSettingsBtn.addEventListener('click', function() {
+    settings.syncMode = document.querySelector('input[name="syncMode"]:checked').value;
+    settings.githubToken = $('githubTokenInput').value.trim();
+    settings.gistId = $('gistIdInput').value.trim();
+    settings.lskyUrl = $('lskyUrlInput').value.trim();
+    settings.lskyToken = $('lskyTokenInput').value.trim();
+    save();
+    closeSettings();
+    toast('设置已保存', 'success');
+});
+
+// Click outside modal to close
+settingsModal.addEventListener('click', function(e) {
+    if (e.target === settingsModal) closeSettings();
+});
+
+// ===== Password management =====
+$('setPasswordBtn').addEventListener('click', function() {
+    $('pwdForm').classList.remove('hidden');
+    $('currentPwdGroup').classList.add('hidden');
+    $('newPwdLabel').textContent = '新密码';
+    $('newPwdInput').value = '';
+    $('confirmPwdInput').value = '';
+    $('currentPwdInput').value = '';
+    $('pwdMsg').classList.remove('visible');
+});
+
+$('changePasswordBtn').addEventListener('click', function() {
+    $('pwdForm').classList.remove('hidden');
+    $('currentPwdGroup').classList.remove('hidden');
+    $('newPwdLabel').textContent = '新密码';
+    $('newPwdInput').value = '';
+    $('confirmPwdInput').value = '';
+    $('currentPwdInput').value = '';
+    $('pwdMsg').classList.remove('visible');
+});
+
+$('cancelPwdBtn').addEventListener('click', function() {
+    $('pwdForm').classList.add('hidden');
+});
+
+$('savePwdBtn').addEventListener('click', function() {
+    const msg = $('pwdMsg');
+    const isNew = !settings.password;
+    const current = $('currentPwdInput').value;
+    const np = $('newPwdInput').value;
+    const cp = $('confirmPwdInput').value;
+
+    if (!isNew && current !== settings.password) {
+        msg.textContent = '当前密码错误'; msg.className = 'pwd-msg error visible'; return;
+    }
+    if (!np) {
+        msg.textContent = '请输入新密码'; msg.className = 'pwd-msg error visible'; return;
+    }
+    if (np !== cp) {
+        msg.textContent = '两次密码不一致'; msg.className = 'pwd-msg error visible'; return;
+    }
+    settings.password = np;
+    save();
+    updatePasswordUI();
+    toast('密码已保存', 'success');
+});
+
+$('removePasswordBtn').addEventListener('click', function() {
+    if (confirm('确定移除密码保护？')) {
+        settings.password = '';
+        save();
+        updatePasswordUI();
+        toast('密码已移除', 'success');
+    }
+});
+
+// ===== Test connections =====
+$('testGistBtn').addEventListener('click', function() {
+    const token = $('githubTokenInput').value.trim();
+    const gistId = $('gistIdInput').value.trim();
+    const dot = $('gistStatusDot'), text = $('gistStatusText');
+    if (!token) { toast('请先输入 Token', 'error'); return; }
+    dot.classList.remove('active'); text.textContent = '测试中…';
+    fetch('https://api.github.com/gists' + (gistId ? '/' + gistId : ''), {
+        headers: { 'Authorization': 'token ' + token }
+    }).then(r => {
+        if (r.ok) { dot.classList.add('active'); text.textContent = '连接成功'; toast('Gist 连接成功', 'success'); }
+        else { dot.classList.remove('active'); text.textContent = '连接失败'; toast('Gist 连接失败', 'error'); }
+    }).catch(() => { dot.classList.remove('active'); text.textContent = '网络错误'; toast('网络错误', 'error'); });
+});
+
+$('testLskyBtn').addEventListener('click', function() {
+    const url = $('lskyUrlInput').value.trim().replace(/\/+$/, '');
+    const token = $('lskyTokenInput').value.trim();
+    const dot = $('lskyStatusDot'), text = $('lskyStatusText');
+    if (!url || !token) { toast('请先填写地址和 Token', 'error'); return; }
+    dot.classList.remove('active'); text.textContent = '测试中…';
+    fetch(url + '/api/v1/profile', {
+        headers: { 'Authorization': token.startsWith('Bearer ') ? token : 'Bearer ' + token }
+    }).then(r => {
+        if (r.ok) { dot.classList.add('active'); text.textContent = '连接成功'; toast('图床连接成功', 'success'); }
+        else { dot.classList.remove('active'); text.textContent = '连接失败'; toast('图床连接失败', 'error'); }
+    }).catch(() => { dot.classList.remove('active'); text.textContent = '网络错误'; toast('网络错误', 'error'); });
+});
+
+// ===== Sync =====
+syncBtn.addEventListener('click', function() {
+    if (settings.syncMode === 'off') { toast('请先在设置中开启同步', 'error'); return; }
+    if (!settings.githubToken || !settings.gistId) { toast('请先配置 GitHub Gist', 'error'); return; }
+    syncBtn.classList.add('sync-spin');
+    fetch('https://api.github.com/gists/' + settings.gistId, {
+        headers: { 'Authorization': 'token ' + settings.githubToken }
+    }).then(r => r.json()).then(data => {
+        const files = data.files || {};
+        const file = Object.values(files)[0];
+        if (file && file.content) {
+            const remote = JSON.parse(file.content);
+            if (Array.isArray(remote) && remote.length > notes.length) {
+                notes = remote;
+                save();
+                renderHistory();
+            }
+        }
+        // Push local
+        return fetch('https://api.github.com/gists/' + settings.gistId, {
+            method: 'PATCH',
+            headers: { 'Authorization': 'token ' + settings.githubToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: { 'jian-notes.json': { content: JSON.stringify(notes) } } })
+        });
+    }).then(() => {
+        syncBtn.classList.remove('sync-spin');
+        toast('同步完成', 'success');
+    }).catch(() => {
+        syncBtn.classList.remove('sync-spin');
+        toast('同步失败', 'error');
+    });
+});
+
+// ===== Image attach =====
+attachBtn.addEventListener('click', function() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.onchange = function() {
+        Array.from(input.files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                pendingImages.push(e.target.result);
+                renderImagePreview();
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+    input.click();
+});
+
+function renderImagePreview() {
+    if (pendingImages.length === 0) {
+        inputImagesPreview.innerHTML = '';
+        inputImagesPreview.classList.add('hidden');
+        return;
+    }
+    inputImagesPreview.classList.remove('hidden');
+    inputImagesPreview.innerHTML = pendingImages.map((img, i) =>
+        '<div class="preview-thumb"><img src="' + img + '" alt=""><button class="remove-thumb" data-idx="' + i + '">&times;</button></div>'
+    ).join('');
+
+    inputImagesPreview.querySelectorAll('.remove-thumb').forEach(btn => {
+        btn.addEventListener('click', function() {
+            pendingImages.splice(parseInt(this.dataset.idx), 1);
+            renderImagePreview();
+        });
+    });
+}
+
+// ===== Drag & drop images =====
+['dragenter', 'dragover'].forEach(evt => {
+    contentInput.addEventListener(evt, e => { e.preventDefault(); dropOverlay.classList.remove('hidden'); });
+});
+['dragleave', 'drop'].forEach(evt => {
+    contentInput.addEventListener(evt, e => { e.preventDefault(); dropOverlay.classList.add('hidden'); });
+});
+contentInput.addEventListener('drop', function(e) {
+    const files = e.dataTransfer.files;
+    Array.from(files).forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            pendingImages.push(ev.target.result);
+            renderImagePreview();
+        };
+        reader.readAsDataURL(file);
+    });
+});
+
+// ===== Fullscreen =====
+fullscreenBtn.addEventListener('click', function() {
+    editorSection.classList.toggle('fullscreen');
+    if (editorSection.classList.contains('fullscreen')) {
+        contentInput.focus();
+    }
+});
+
+// Escape to exit fullscreen
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && editorSection.classList.contains('fullscreen')) {
+        editorSection.classList.remove('fullscreen');
+    }
+});
+
+// ===== Back to top =====
+window.addEventListener('scroll', function() {
+    backToTop.classList.toggle('visible', window.scrollY > 300);
+});
+backToTop.addEventListener('click', function() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// ===== Init =====
+initLock();
+renderHistory();
+
+// Show first tool group on desktop
+if (window.innerWidth > 560) {
+    document.querySelectorAll('.tool-group').forEach(g => g.style.display = 'flex');
+}
+
+})();
+</script>
+</body>
+</html>
