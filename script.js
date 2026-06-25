@@ -27,8 +27,11 @@ const inputArea = $('inputArea'), dropOverlay = $('dropOverlay'), inputImagesPre
 const historyList = $('historyList'), historyCount = $('historyCount');
 const searchInput = $('searchInput');
 const exportBtn = $('exportBtn'), clearAllBtn = $('clearAllBtn');
+const filterBtn = $('filterBtn'), filterLabel = $('filterLabel'), filterDropdown = $('filterDropdown'), filterWrap = $('filterWrap');
 const settingsModal = $('settingsModal'), closeSettingsBtn = $('closeSettingsBtn'),
       cancelSettingsBtn = $('cancelSettingsBtn'), saveSettingsBtn = $('saveSettingsBtn');
+const confirmOverlay = $('confirmOverlay'), confirmText = $('confirmText'),
+      confirmOkBtn = $('confirmOkBtn'), confirmCancelBtn = $('confirmCancelBtn');
 const lightbox = $('lightbox'), lightboxImg = $('lightboxImg');
 const contextMenu = $('contextMenu');
 const toastContainer = $('toastContainer');
@@ -39,11 +42,15 @@ const pagination = $('pagination'), pageNav = $('pageNav');
 let notes = JSON.parse(localStorage.getItem('jian_notes') || '[]');
 let editingId = null;
 let pendingImages = [];
-let settings = JSON.parse(localStorage.getItem('jian_settings') || '{"syncMode":"off","githubToken":"","gistId":"","lskyUrl":"","lskyToken":"","password":""}');
+let settings = JSON.parse(localStorage.getItem('jian_settings') || '{"githubToken":"","repoName":"","password":""}');
 let currentFilter = '';
+let currentModeFilter = 'all';
 let currentPage = 1;
 const PAGE_SIZE = 5;
 const MAX_NOTES = 50;
+const MAX_COMMITS = 20;
+let syncTimer = null;
+let syncing = false;
 
 // ===== Utils =====
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
@@ -73,6 +80,28 @@ function renderMd(text) {
     try { return marked.parse(text || ''); } catch(e) { return '<p>' + escHtml(text) + '</p>'; }
 }
 
+function showConfirm(text) {
+    return new Promise(resolve => {
+        confirmText.textContent = text;
+        confirmOverlay.classList.remove('hidden');
+        function cleanup(result) {
+            confirmOverlay.classList.add('hidden');
+            confirmOkBtn.removeEventListener('click', onOk);
+            confirmCancelBtn.removeEventListener('click', onCancel);
+            overlayClick.removeEventListener('click', onCancel);
+            resolve(result);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        confirmOkBtn.addEventListener('click', onOk);
+        confirmCancelBtn.addEventListener('click', onCancel);
+        const overlayClick = confirmOverlay;
+        overlayClick.addEventListener('click', function handler(e) {
+            if (e.target === confirmOverlay) onCancel();
+        });
+    });
+}
+
 function calcReadingTime(text) {
     if (!text) return 0;
     const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
@@ -81,8 +110,12 @@ function calcReadingTime(text) {
 }
 
 // ===== Lock =====
+function isRepoConfigured() {
+    return !!(settings.githubToken && settings.repoName);
+}
+
 function initLock() {
-    if (settings.syncMode !== 'off' && settings.password) {
+    if (isRepoConfigured() && settings.password) {
         lockScreen.classList.remove('hidden');
         lockPasswordInput.focus();
     } else {
@@ -231,6 +264,7 @@ function doSave() {
     currentPage = 1;
     renderHistory();
     toast('保存成功', 'success');
+    autoSync();
 }
 
 saveBtn.addEventListener('click', doSave);
@@ -252,10 +286,19 @@ editingCancelBtn.addEventListener('click', function() {
 });
 
 // ===== History render =====
+function getNoteMode(note) {
+    const hasText = !!(note.content && note.content.trim());
+    const hasImages = !!(note.images && note.images.length);
+    if (hasText && hasImages) return 'mixed';
+    if (hasImages) return 'image';
+    return 'text';
+}
+
 function getFilteredList() {
     const q = (searchInput.value || '').trim().toLowerCase();
     let list = [...notes].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updatedAt - a.updatedAt);
     if (q) list = list.filter(n => n.content.toLowerCase().includes(q));
+    if (currentModeFilter !== 'all') list = list.filter(n => getNoteMode(n) === currentModeFilter);
     return list;
 }
 
@@ -295,8 +338,11 @@ function renderHistory() {
             ).join('') + '</div>';
         }
 
+        const mode = getNoteMode(note);
+        const modeLabel = mode === 'mixed' ? '综合' : mode === 'image' ? '图片' : '文本';
+
         card.innerHTML =
-            '<div class="card-header"><div class="card-meta"><span class="card-mode">文本</span><span class="card-time">' + fmtTime(note.updatedAt) + '</span></div>' +
+            '<div class="card-header"><div class="card-meta"><span class="card-mode" data-mode="' + mode + '">' + modeLabel + '</span><span class="card-time">' + fmtTime(note.updatedAt) + '</span></div>' +
             '<div class="card-actions">' +
                 '<button class="card-action pin-btn" data-id="' + note.id + '" title="' + (note.pinned ? '取消置顶' : '置顶') + '">' +
                     '<svg viewBox="0 0 24 24" fill="' + (note.pinned ? 'var(--pin-color)' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"/></svg>' +
@@ -374,7 +420,7 @@ function bindHistoryEvents() {
 
         if (target.classList.contains('pin-btn')) {
             const n = notes.find(n => n.id === id);
-            if (n) { n.pinned = !n.pinned; save(); renderHistory(); }
+            if (n) { n.pinned = !n.pinned; save(); renderHistory(); autoSync(); }
             return;
         }
 
@@ -404,7 +450,8 @@ function bindHistoryEvents() {
         }
 
         if (target.classList.contains('delete-btn')) {
-            if (confirm('确定删除这条记录？')) {
+            showConfirm('确定删除这条记录？').then(ok => {
+                if (!ok) return;
                 notes = notes.filter(n => n.id !== id);
                 if (editingId === id) {
                     editingId = null;
@@ -414,7 +461,8 @@ function bindHistoryEvents() {
                 save();
                 renderHistory();
                 toast('已删除', 'success');
-            }
+                autoSync();
+            });
             return;
         }
 
@@ -684,12 +732,33 @@ document.addEventListener('contextmenu', function(e) {
 // ===== Search =====
 searchInput.addEventListener('input', function() { currentPage = 1; renderHistory(); });
 
+// ===== Mode filter =====
+filterBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    filterDropdown.classList.toggle('hidden');
+});
+
+filterDropdown.addEventListener('click', function(e) {
+    const option = e.target.closest('.filter-option');
+    if (!option) return;
+    currentModeFilter = option.dataset.filter;
+    filterLabel.textContent = option.textContent;
+    filterDropdown.querySelectorAll('.filter-option').forEach(o => o.classList.remove('active'));
+    option.classList.add('active');
+    filterDropdown.classList.add('hidden');
+    currentPage = 1;
+    renderHistory();
+});
+
+document.addEventListener('click', function(e) {
+    if (!filterWrap.contains(e.target)) filterDropdown.classList.add('hidden');
+});
+
 // ===== Export =====
 exportBtn.addEventListener('click', function() {
     if (notes.length === 0) { toast('没有可导出的记录', 'error'); return; }
     const data = notes.map(n => ({
         content: n.content,
-        images: n.images || [],
         pinned: n.pinned,
         createdAt: n.createdAt,
         updatedAt: n.updatedAt
@@ -704,51 +773,10 @@ exportBtn.addEventListener('click', function() {
     toast('导出成功', 'success');
 });
 
-// ===== Import =====
-const importFileInput = document.createElement('input');
-importFileInput.type = 'file';
-importFileInput.accept = '.json';
-importFileInput.style.display = 'none';
-document.body.appendChild(importFileInput);
-
-importBtn.addEventListener('click', function() {
-    importFileInput.value = '';
-    importFileInput.click();
-});
-
-importFileInput.addEventListener('change', function() {
-    const file = this.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            if (!Array.isArray(data)) { toast('文件格式错误', 'error'); return; }
-            const valid = data.filter(n => n && typeof n.content === 'string');
-            if (valid.length === 0) { toast('没有有效记录', 'error'); return; }
-            valid.forEach(n => {
-                if (!n.id) n.id = uid();
-                if (!n.createdAt) n.createdAt = Date.now();
-                if (!n.updatedAt) n.updatedAt = n.createdAt;
-                if (!n.images) n.images = [];
-                if (n.pinned === undefined) n.pinned = false;
-            });
-            notes = [...valid, ...notes];
-            save();
-            currentPage = 1;
-            renderHistory();
-            toast('导入成功，共 ' + valid.length + ' 条记录', 'success');
-        } catch(err) {
-            toast('文件解析失败', 'error');
-        }
-    };
-    reader.readAsText(file);
-});
-
 // ===== Clear All =====
-clearAllBtn.addEventListener('click', function() {
+clearAllBtn.addEventListener('click', async function() {
     if (notes.length === 0) { toast('没有可清空的记录', 'error'); return; }
-    if (confirm('确定要清空所有记录吗？此操作不可恢复！')) {
+    if (await showConfirm('确定要清空所有记录吗？此操作不可恢复！')) {
         notes = [];
         editingId = null;
         contentInput.value = '';
@@ -756,18 +784,15 @@ clearAllBtn.addEventListener('click', function() {
         save();
         renderHistory();
         toast('已清空所有记录', 'success');
+        autoSync();
     }
 });
 
 // ===== Settings Modal =====
 function openSettings() {
     settingsModal.classList.remove('hidden');
-    const radios = document.querySelectorAll('input[name="syncMode"]');
-    radios.forEach(r => { r.checked = r.value === settings.syncMode; });
     $('githubTokenInput').value = settings.githubToken || '';
-    $('gistIdInput').value = settings.gistId || '';
-    $('lskyUrlInput').value = settings.lskyUrl || '';
-    $('lskyTokenInput').value = settings.lskyToken || '';
+    $('repoNameInput').value = settings.repoName || '';
     updateSettingsUI();
 }
 
@@ -776,23 +801,10 @@ function closeSettings() {
 }
 
 function updateSettingsUI() {
-    const mode = document.querySelector('input[name="syncMode"]:checked').value;
-    const ghSection = $('githubSection');
-    const lskySection = $('lskySection');
-    const pwdSection = $('passwordSection');
+    const configured = !!($('githubTokenInput').value.trim() && $('repoNameInput').value.trim());
     const pwdHint = $('passwordSyncHint');
     const pwdControls = $('passwordControls');
-
-    if (mode === 'off') {
-        ghSection.classList.add('hidden');
-        lskySection.classList.add('hidden');
-    } else {
-        ghSection.classList.remove('hidden');
-        if (mode === 'text+image') lskySection.classList.remove('hidden');
-        else lskySection.classList.add('hidden');
-    }
-
-    if (mode !== 'off') {
+    if (configured) {
         pwdHint.classList.add('hidden');
         pwdControls.classList.remove('hidden');
         updatePasswordUI();
@@ -816,19 +828,16 @@ settingsBtn.addEventListener('click', openSettings);
 closeSettingsBtn.addEventListener('click', closeSettings);
 cancelSettingsBtn.addEventListener('click', closeSettings);
 
-document.querySelectorAll('input[name="syncMode"]').forEach(r => {
-    r.addEventListener('change', updateSettingsUI);
-});
+$('githubTokenInput').addEventListener('input', updateSettingsUI);
+$('repoNameInput').addEventListener('input', updateSettingsUI);
 
 saveSettingsBtn.addEventListener('click', function() {
-    settings.syncMode = document.querySelector('input[name="syncMode"]:checked').value;
     settings.githubToken = $('githubTokenInput').value.trim();
-    settings.gistId = $('gistIdInput').value.trim();
-    settings.lskyUrl = $('lskyUrlInput').value.trim();
-    settings.lskyToken = $('lskyTokenInput').value.trim();
+    settings.repoName = $('repoNameInput').value.trim().replace(/^github\.com\//i, '');
     save();
     closeSettings();
     toast('设置已保存', 'success');
+    if (isRepoConfigured()) pullFromRepo();
 });
 
 settingsModal.addEventListener('click', function(e) {
@@ -882,8 +891,8 @@ $('savePwdBtn').addEventListener('click', function() {
     toast('密码已保存', 'success');
 });
 
-$('removePasswordBtn').addEventListener('click', function() {
-    if (confirm('确定移除密码保护？')) {
+$('removePasswordBtn').addEventListener('click', async function() {
+    if (await showConfirm('确定移除密码保护？')) {
         settings.password = '';
         save();
         updatePasswordUI();
@@ -891,66 +900,168 @@ $('removePasswordBtn').addEventListener('click', function() {
     }
 });
 
-// ===== Test connections =====
-$('testGistBtn').addEventListener('click', function() {
+// ===== Test repo connection =====
+$('testRepoBtn').addEventListener('click', function() {
     const token = $('githubTokenInput').value.trim();
-    const gistId = $('gistIdInput').value.trim();
-    const dot = $('gistStatusDot'), text = $('gistStatusText');
+    const repo = $('repoNameInput').value.trim().replace(/^github\.com\//i, '');
+    const dot = $('repoStatusDot'), text = $('repoStatusText');
     if (!token) { toast('请先输入 Token', 'error'); return; }
+    if (!repo) { toast('请先填写仓库名', 'error'); return; }
     dot.classList.remove('active'); text.textContent = '测试中…';
-    fetch('https://api.github.com/gists' + (gistId ? '/' + gistId : ''), {
+    fetch('https://api.github.com/repos/' + repo, {
         headers: { 'Authorization': 'token ' + token }
     }).then(r => {
-        if (r.ok) { dot.classList.add('active'); text.textContent = '连接成功'; toast('Gist 连接成功', 'success'); }
-        else { dot.classList.remove('active'); text.textContent = '连接失败'; toast('Gist 连接失败', 'error'); }
+        if (r.ok) { dot.classList.add('active'); text.textContent = '连接成功'; toast('仓库连接成功', 'success'); }
+        else if (r.status === 404) { dot.classList.remove('active'); text.textContent = '无法访问'; toast('仓库不存在或 Token 无 repo 权限（私有仓库需要勾选 repo）', 'error'); }
+        else if (r.status === 401) { dot.classList.remove('active'); text.textContent = 'Token 无效'; toast('Token 无效或已过期', 'error'); }
+        else { dot.classList.remove('active'); text.textContent = '连接失败'; toast('连接失败 (' + r.status + ')', 'error'); }
     }).catch(() => { dot.classList.remove('active'); text.textContent = '网络错误'; toast('网络错误', 'error'); });
 });
 
-$('testLskyBtn').addEventListener('click', function() {
-    const url = $('lskyUrlInput').value.trim().replace(/\/+$/, '');
-    const token = $('lskyTokenInput').value.trim();
-    const dot = $('lskyStatusDot'), text = $('lskyStatusText');
-    if (!url || !token) { toast('请先填写地址和 Token', 'error'); return; }
-    dot.classList.remove('active'); text.textContent = '测试中…';
-    fetch(url + '/api/v1/profile', {
-        headers: { 'Authorization': token.startsWith('Bearer ') ? token : 'Bearer ' + token }
-    }).then(r => {
-        if (r.ok) { dot.classList.add('active'); text.textContent = '连接成功'; toast('图床连接成功', 'success'); }
-        else { dot.classList.remove('active'); text.textContent = '连接失败'; toast('图床连接失败', 'error'); }
-    }).catch(() => { dot.classList.remove('active'); text.textContent = '网络错误'; toast('网络错误', 'error'); });
-});
+// ===== GitHub Repo API =====
+const DATA_PATH = 'data/notes.json';
 
-// ===== Sync =====
-syncBtn.addEventListener('click', function() {
-    if (settings.syncMode === 'off') { toast('请先在设置中开启同步', 'error'); return; }
-    if (!settings.githubToken || !settings.gistId) { toast('请先配置 GitHub Gist', 'error'); return; }
-    syncBtn.classList.add('sync-spin');
-    fetch('https://api.github.com/gists/' + settings.gistId, {
-        headers: { 'Authorization': 'token ' + settings.githubToken }
-    }).then(r => r.json()).then(data => {
-        const files = data.files || {};
-        const file = Object.values(files)[0];
-        if (file && file.content) {
-            const remote = JSON.parse(file.content);
-            if (Array.isArray(remote) && remote.length > notes.length) {
-                notes = remote;
-                save();
-                renderHistory();
-            }
-        }
-        return fetch('https://api.github.com/gists/' + settings.gistId, {
-            method: 'PATCH',
-            headers: { 'Authorization': 'token ' + settings.githubToken, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ files: { 'jian-notes.json': { content: JSON.stringify(notes) } } })
+function ghApi(path, options) {
+    return fetch('https://api.github.com' + path, Object.assign({}, options, {
+        headers: Object.assign({
+            'Authorization': 'token ' + settings.githubToken,
+            'Accept': 'application/vnd.github.v3+json'
+        }, options && options.headers)
+    }));
+}
+
+function repoReadFile(path) {
+    const [owner, repo] = settings.repoName.split('/');
+    return ghApi('/repos/' + owner + '/' + repo + '/contents/' + path).then(function(r) {
+        if (!r.ok) return null;
+        return r.json().then(function(data) {
+            return { content: atob(data.content.replace(/\n/g, '')), sha: data.sha };
         });
-    }).then(() => {
+    });
+}
+
+function repoWriteFile(path, content, sha, message) {
+    var [owner, repo] = settings.repoName.split('/');
+    var body = { message: message || 'sync', content: btoa(unescape(encodeURIComponent(content))) };
+    if (sha) body.sha = sha;
+    return ghApi('/repos/' + owner + '/' + repo + '/contents/' + path, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    }).then(function(r) {
+        if (!r.ok) throw new Error('写入失败');
+        return r.json();
+    });
+}
+
+function repoGetCommitCount(path) {
+    var [owner, repo] = settings.repoName.split('/');
+    return ghApi('/repos/' + owner + '/' + repo + '/commits?path=' + path + '&per_page=1').then(function(r) {
+        if (!r.ok) return 0;
+        var link = r.headers.get('Link');
+        if (!link) return 1;
+        var match = link.match(/page=(\d+)>; rel="last"/);
+        return match ? parseInt(match[1]) : 1;
+    });
+}
+
+function repoCleanupHistory() {
+    var [owner, repo] = settings.repoName.split('/');
+    return ghApi('/repos/' + owner + '/' + repo + '/git/refs/heads/main').then(function(r) {
+        if (!r.ok) throw new Error('获取分支失败');
+        return r.json();
+    }).then(function(refData) {
+        return ghApi('/repos/' + owner + '/' + repo + '/git/commits/' + refData.object.sha);
+    }).then(function(r) {
+        if (!r.ok) throw new Error('获取 commit 失败');
+        return r.json();
+    }).then(function(commitData) {
+        return ghApi('/repos/' + owner + '/' + repo + '/git/commits', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: 'sync (history cleanup)', tree: commitData.tree.sha })
+        });
+    }).then(function(r) {
+        if (!r.ok) throw new Error('创建 commit 失败');
+        return r.json();
+    }).then(function(newCommit) {
+        return ghApi('/repos/' + owner + '/' + repo + '/git/refs/heads/main', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sha: newCommit.sha, force: true })
+        });
+    });
+}
+
+// ===== Sync: push local to remote =====
+function pushToRepo() {
+    if (!isRepoConfigured() || syncing) return Promise.resolve();
+    syncing = true;
+    syncBtn.classList.add('sync-spin');
+    var content = JSON.stringify(notes, null, 2);
+
+    return repoReadFile(DATA_PATH).then(function(result) {
+        var sha = result ? result.sha : null;
+        return repoWriteFile(DATA_PATH, content, sha, 'sync notes');
+    }).then(function(r) {
+        if (!r.ok) throw new Error('写入失败');
+        return repoGetCommitCount(DATA_PATH);
+    }).then(function(count) {
+        if (count > MAX_COMMITS) {
+            return repoCleanupHistory();
+        }
+    }).then(function() {
+        syncing = false;
+        syncBtn.classList.remove('sync-spin');
+    }).catch(function(err) {
+        syncing = false;
+        syncBtn.classList.remove('sync-spin');
+        console.error('push failed:', err);
+    });
+}
+
+// ===== Sync: pull remote to local =====
+function pullFromRepo() {
+    if (!isRepoConfigured()) return Promise.resolve();
+    return repoReadFile(DATA_PATH).then(function(result) {
+        if (result) {
+            try {
+                var remote = JSON.parse(result.content);
+                if (Array.isArray(remote)) {
+                    notes = remote;
+                    save();
+                    currentPage = 1;
+                    renderHistory();
+                }
+            } catch(e) {}
+        }
+    });
+}
+
+// ===== Auto sync (debounced push) =====
+function autoSync() {
+    if (!isRepoConfigured() || syncing) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(pushToRepo, 2000);
+}
+
+// ===== Full sync: cancel debounce → push → pull =====
+function fullSync() {
+    if (!isRepoConfigured()) { toast('请先配置仓库', 'error'); return; }
+    clearTimeout(syncTimer);
+    syncBtn.classList.add('sync-spin');
+    pushToRepo().then(function() {
+        return pullFromRepo();
+    }).then(function() {
         syncBtn.classList.remove('sync-spin');
         toast('同步完成', 'success');
-    }).catch(() => {
+    }).catch(function(err) {
         syncBtn.classList.remove('sync-spin');
-        toast('同步失败', 'error');
+        toast(err.message || '同步失败', 'error');
     });
-});
+}
+
+syncBtn.addEventListener('click', fullSync);
 
 // ===== Image attach =====
 attachBtn.addEventListener('click', function() {
@@ -1121,6 +1232,45 @@ window.addEventListener('scroll', function() {
 backToTop.addEventListener('click', function() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 });
+
+// ===== Init: pull from repo if configured =====
+if (isRepoConfigured()) {
+    repoReadFile(DATA_PATH).then(function(result) {
+        if (result) {
+            try {
+                var remote = JSON.parse(result.content);
+                if (Array.isArray(remote) && remote.length > 0) {
+                    notes = remote;
+                    save();
+                    renderHistory();
+                }
+            } catch(e) {}
+        }
+    }).catch(function() {});
+}
+
+// ===== Drag scroll for mobile toolbars =====
+function initDragScroll(el) {
+    let startX = 0, startScroll = 0, dragging = false;
+    el.addEventListener('touchstart', function(e) {
+        if (e.touches.length !== 1) return;
+        startX = e.touches[0].pageX;
+        startScroll = el.scrollLeft;
+        dragging = false;
+    }, { passive: true });
+    el.addEventListener('touchmove', function(e) {
+        if (e.touches.length !== 1) return;
+        const dx = e.touches[0].pageX - startX;
+        if (!dragging && Math.abs(dx) > 5) dragging = true;
+        if (dragging) {
+            el.scrollLeft = startScroll - dx;
+            e.preventDefault();
+        }
+    }, { passive: false });
+    el.addEventListener('touchend', function() { dragging = false; }, { passive: true });
+}
+
+document.querySelectorAll('.toolbar-cats, .tool-group').forEach(initDragScroll);
 
 // ===== Init =====
 initLock();

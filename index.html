@@ -131,12 +131,11 @@
     <div class="history-header">
         <span class="history-title">历史记录 <span class="history-count" id="historyCount"></span></span>
         <div class="history-actions">
-            <button class="h-action-btn" id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>导入</button>
             <button class="h-action-btn" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出</button>
             <button class="h-action-btn danger" id="clearAllBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>清空</button>
         </div>
     </div>
-    <div class="search-bar" id="searchBar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="searchInput" placeholder="搜索内容…"></div>
+    <div class="search-bar" id="searchBar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="searchInput" placeholder="搜索内容…"><div class="filter-wrap" id="filterWrap"><button class="h-action-btn filter-btn" id="filterBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg><span id="filterLabel">全部</span></button><div class="filter-dropdown hidden" id="filterDropdown"><div class="filter-option active" data-filter="all">全部</div><div class="filter-option" data-filter="text">文本</div><div class="filter-option" data-filter="image">图片</div><div class="filter-option" data-filter="mixed">综合</div></div></div></div>
     <section class="history-list" id="historyList"></section>
     <div class="pagination hidden" id="pagination">
         <div class="page-nav" id="pageNav"></div>
@@ -148,28 +147,15 @@
         <div class="modal-header"><h2>设置</h2><button class="modal-close" id="closeSettingsBtn">&times;</button></div>
         <div class="modal-body">
             <div class="settings-section">
-                <div class="section-title">同步模式</div>
-                <div class="setting-row"><label><input type="radio" name="syncMode" value="off"> 仅本地</label></div>
-                <div class="setting-row"><label><input type="radio" name="syncMode" value="text"> 文本同步</label></div>
-                <div class="setting-row"><label><input type="radio" name="syncMode" value="text+image"> 文本 + 图片同步</label></div>
-            </div>
-            <div class="settings-section" id="githubSection">
-                <div class="section-title">GitHub Gist</div>
-                <div class="form-group"><label>Personal Access Token</label><input type="password" id="githubTokenInput" placeholder="ghp_xxxxxxxxxxxx"><div class="form-hint">需要 gist 权限，Token 仅存储在本地</div></div>
-                <div class="form-group"><label>Gist ID（可选，留空自动创建）</label><input type="text" id="gistIdInput" placeholder="例：abc123def456"></div>
-                <div class="status-row" id="gistStatus"><span class="status-dot" id="gistStatusDot"></span><span class="status-text" id="gistStatusText">未配置</span></div>
-                <button class="inline-btn" id="testGistBtn">测试连接</button>
-            </div>
-            <div class="settings-section" id="lskySection">
-                <div class="section-title">兰空图床 (Lsky Pro)</div>
-                <div class="form-group"><label>图床地址</label><input type="text" id="lskyUrlInput" placeholder="https://image.example.com"></div>
-                <div class="form-group"><label>Token</label><input type="password" id="lskyTokenInput" placeholder="Bearer xxxxxxxx"><div class="form-hint">在图床后台 → 接口认证 中获取</div></div>
-                <div class="status-row" id="lskyStatus"><span class="status-dot" id="lskyStatusDot"></span><span class="status-text" id="lskyStatusText">未配置</span></div>
-                <button class="inline-btn" id="testLskyBtn">测试连接</button>
+                <div class="section-title">GitHub 同步</div>
+                <div class="form-group"><label>Personal Access Token</label><input type="password" id="githubTokenInput" placeholder="ghp_xxxxxxxxxxxx"><div class="form-hint">需要 repo 权限，Token 仅存储在本地</div></div>
+                <div class="form-group"><label>仓库名</label><input type="text" id="repoNameInput" placeholder="例：Garonix/easytie"><div class="form-hint">Fork 本仓库后填写，格式：用户名/仓库名</div></div>
+                <div class="status-row" id="repoStatus"><span class="status-dot" id="repoStatusDot"></span><span class="status-text" id="repoStatusText">未配置</span></div>
+                <button class="inline-btn" id="testRepoBtn">测试连接</button>
             </div>
             <div class="settings-section" id="passwordSection">
                 <div class="section-title">访问密码</div>
-                <div id="passwordSyncHint" class="sync-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>需要开启跨端同步后才能使用密码功能</span></div>
+                <div id="passwordSyncHint" class="sync-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>需要开启 GitHub 同步后才能使用密码功能</span></div>
                 <div id="passwordControls" class="hidden">
                     <div class="status-row"><span class="status-dot" id="pwdStatusDot"></span><span class="status-text" id="pwdStatusText">未设置</span></div>
                     <div class="btn-row">
@@ -191,6 +177,18 @@
     </div>
 </div>
 
+<div id="confirmOverlay" class="modal-overlay hidden">
+    <div class="confirm-modal">
+        <div class="confirm-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <p class="confirm-text" id="confirmText">确定要执行此操作吗？</p>
+        <div class="confirm-actions">
+            <button class="btn btn-ghost" id="confirmCancelBtn">取消</button>
+            <button class="btn btn-primary" id="confirmOkBtn">确认</button>
+        </div>
+    </div>
+</div>
 <div id="lightbox" class="lightbox hidden"><img id="lightboxImg" src="" alt=""></div>
 <div id="contextMenu" class="context-menu hidden"></div>
 <div id="toastContainer" class="toast-container"></div>
