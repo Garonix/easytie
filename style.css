@@ -84,7 +84,7 @@ body{font-family:var(--font-body);font-weight:400;color:var(--text);background:v
 /* --- Toolbar Mobile (< 560px) --- */
 @media(max-width:560px){
     .md-toolbar{flex-direction:column;align-items:stretch;padding:0;gap:0}
-    .toolbar-cats{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 8px;gap:6px;scrollbar-width:none}
+    .toolbar-cats{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 20px 6px 8px;gap:5px;scrollbar-width:none}
     .toolbar-cats::-webkit-scrollbar{display:none}
     .cat-btn{display:flex;align-items:center;gap:5px;padding:7px 14px;flex-shrink:0;background:var(--surface);border:1px solid var(--border-light);border-radius:22px;cursor:pointer;font-size:12px;font-family:var(--font-body);font-weight:500;color:var(--text-secondary);transition:background .2s,border-color .2s,color .2s;white-space:nowrap;min-height:38px;-webkit-tap-highlight-color:transparent}
     .cat-btn:active{transform:scale(.96)}
@@ -238,6 +238,12 @@ body{font-family:var(--font-body);font-weight:400;color:var(--text);background:v
 .section-title{font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:14px;letter-spacing:.5px}
 .setting-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.setting-row:last-child{margin-bottom:0}
 .setting-row label{font-size:14px;color:var(--text);display:flex;align-items:center;gap:10px;cursor:pointer}
+.toggle-switch{position:relative;width:44px;height:24px;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:12px;cursor:pointer;transition:background .25s}
+.toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:transform .25s}
+.toggle-switch input:checked+.toggle-slider{background:var(--accent)}
+.toggle-switch input:checked+.toggle-slider::before{transform:translateX(20px)}
 .setting-row input[type="radio"]{accent-color:var(--accent);width:16px;height:16px}
 .form-group{margin-bottom:14px}.form-group label{display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px}
 .form-group input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:var(--font-body);color:var(--text);background:var(--bg);outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
