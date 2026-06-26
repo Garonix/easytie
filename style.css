@@ -86,7 +86,7 @@ body{font-family:var(--font-body);font-weight:400;color:var(--text);background:v
     .md-toolbar{flex-direction:column;align-items:stretch;padding:0;gap:0}
     .toolbar-cats{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 20px 6px 8px;gap:5px;scrollbar-width:none}
     .toolbar-cats::-webkit-scrollbar{display:none}
-    .cat-btn{display:flex;align-items:center;gap:5px;padding:7px 14px;flex-shrink:0;background:var(--surface);border:1px solid var(--border-light);border-radius:22px;cursor:pointer;font-size:12px;font-family:var(--font-body);font-weight:500;color:var(--text-secondary);transition:background .2s,border-color .2s,color .2s;white-space:nowrap;min-height:38px;-webkit-tap-highlight-color:transparent}
+    .cat-btn{display:flex;align-items:center;gap:4px;padding:7px 11px;flex-shrink:0;background:var(--surface);border:1px solid var(--border-light);border-radius:22px;cursor:pointer;font-size:12px;font-family:var(--font-body);font-weight:500;color:var(--text-secondary);transition:background .2s,border-color .2s,color .2s;white-space:nowrap;min-height:38px;-webkit-tap-highlight-color:transparent}
     .cat-btn:active{transform:scale(.96)}
     .cat-btn svg:first-child{width:16px;height:16px;flex-shrink:0}
     .cat-chevron{width:12px;height:12px;flex-shrink:0;transition:transform .25s ease;color:var(--text-muted)}
