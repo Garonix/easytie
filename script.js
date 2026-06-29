@@ -32,7 +32,7 @@ const historyList = $('historyList'), historyCount = $('historyCount');
 const searchInput = $('searchInput');
 const exportBtn = $('exportBtn'), clearAllBtn = $('clearAllBtn');
 const importBtn = $('importBtn'), importFileInput = $('importFileInput');
-const exportMdBtn = $('exportMdBtn'), trashBtn = $('trashBtn');
+const trashBtn = $('trashBtn');
 const themeBtn = $('themeBtn'), themeIcon = $('themeIcon');
 const trashModal = $('trashModal'), trashList = $('trashList'), trashEmpty = $('trashEmpty'),
       closeTrashBtn = $('closeTrashBtn'), closeTrashBtn2 = $('closeTrashBtn2'), emptyTrashBtn = $('emptyTrashBtn');
@@ -497,12 +497,15 @@ function renderHistory() {
                 '<button class="card-action copy-btn" data-id="' + note.id + '" title="复制">' +
                     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
                 '</button>' +
+                '<button class="card-action md-export-btn" data-id="' + note.id + '" title="导出 Markdown">' +
+                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' +
+                '</button>' +
                 '<button class="card-action danger delete-btn" data-id="' + note.id + '" title="删除">' +
                     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
                 '</button>' +
             '</div></div>' +
             '<div class="card-content markdown-body">' + renderMd(preview) + '</div>' +
-            (hasMore ? '<button class="card-expand expand-btn" data-id="' + note.id + '">展开全文</button>' : '') +
+            (hasMore ? '<button class="card-expand expand-btn" data-id="' + note.id + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>' : '') +
             imgsHtml;
 
         historyList.appendChild(card);
@@ -628,18 +631,34 @@ function bindHistoryEvents() {
             return;
         }
 
-        if (target.classList.contains('expand-btn')) {
-            const card = target.closest('.history-card');
+        if (target.classList.contains('expand-btn') || target.closest('.expand-btn')) {
+            const btn = target.closest('.expand-btn') || target;
+            const card = btn.closest('.history-card');
             const content = card.querySelector('.card-content');
             const n = notes.find(n => n.id === id);
             if (content.classList.contains('expanded')) {
                 content.classList.remove('expanded');
                 content.innerHTML = renderMd(n.content.substring(0, 300) + '…');
-                target.textContent = '展开全文';
+                btn.classList.remove('open');
             } else {
                 content.classList.add('expanded');
                 content.innerHTML = renderMd(n.content);
-                target.textContent = '收起';
+                btn.classList.add('open');
+            }
+            return;
+        }
+
+        if (target.classList.contains('md-export-btn')) {
+            const n = notes.find(n => n.id === id);
+            if (n) {
+                const blob = new Blob([n.content], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'jian-' + n.id + '.md';
+                a.click();
+                URL.revokeObjectURL(url);
+                toast('已导出 Markdown', 'success');
             }
             return;
         }
@@ -900,36 +919,6 @@ exportBtn.addEventListener('click', function() {
     a.click();
     URL.revokeObjectURL(url);
     toast('导出成功', 'success');
-});
-
-// ===== Export Markdown =====
-exportMdBtn.addEventListener('click', function() {
-    const active = notes.filter(n => !n.deleted);
-    if (active.length === 0) { toast('没有可导出的记录', 'error'); return; }
-    if (active.length === 1) {
-        const blob = new Blob([active[0].content], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'jian-' + active[0].id + '.md';
-        a.click();
-        URL.revokeObjectURL(url);
-        toast('导出成功', 'success');
-    } else {
-        let md = '';
-        active.forEach((n, i) => {
-            if (i > 0) md += '\n\n---\n\n';
-            md += n.content;
-        });
-        const blob = new Blob([md], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'jian-all-' + new Date().toISOString().slice(0, 10) + '.md';
-        a.click();
-        URL.revokeObjectURL(url);
-        toast('导出成功', 'success');
-    }
 });
 
 // ===== Import =====

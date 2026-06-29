@@ -163,10 +163,10 @@ body{font-family:var(--font-body);font-weight:400;color:var(--text);background:v
 
 .search-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;animation:fadeUp .5s ease .15s both;position:relative;z-index:10}
 .search-bar>svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;z-index:1}
-.search-bar input{flex:1;min-width:0;padding:10px 14px 10px 38px;border:1px solid var(--border-light);border-radius:var(--radius-md);font-size:14px;font-family:var(--font-body);color:var(--text);background:var(--surface);outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
+.search-bar input{flex:1;min-width:0;height:32px;padding:0 14px 0 38px;border:1px solid var(--border-light);border-radius:var(--radius-sm);font-size:13px;font-family:var(--font-body);color:var(--text);background:var(--surface);outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
 .search-bar input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-focus)}.search-bar input::placeholder{color:var(--text-muted)}
 .filter-wrap{position:relative;flex-shrink:0}
-.filter-btn{gap:5px;padding:0 12px;height:38px}
+.filter-btn{gap:5px;padding:0 12px;height:32px}
 .filter-btn svg{width:14px;height:14px;pointer-events:none}
 .filter-btn span{font-size:13px;pointer-events:none}
 .filter-dropdown{position:absolute;top:calc(100% + 6px);right:0;z-index:200;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:4px;animation:ctxIn .12s ease}
@@ -191,10 +191,10 @@ body{font-family:var(--font-body);font-weight:400;color:var(--text);background:v
 .card-action{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:var(--radius-sm);cursor:pointer;color:var(--text-muted);transition:all var(--transition);-webkit-tap-highlight-color:transparent}
 .card-action.pinned-btn{color:var(--pin-color);opacity:1}
 .card-action svg{width:15px;height:15px;pointer-events:none}
-.card-content{padding:10px 16px 14px;font-size:14px;line-height:1.8;color:var(--text);word-break:break-word;max-height:200px;overflow:hidden;position:relative;transition:max-height .4s ease}
+.card-content{padding:10px 16px 14px;font-size:14px;line-height:1.8;color:var(--text);word-break:break-word;max-height:200px;overflow:hidden;position:relative;transition:max-height .45s cubic-bezier(.4,0,.2,1)}
 .card-content.expanded{max-height:none}
 .card-content:not(.expanded)::after{content:'';position:absolute;bottom:0;left:0;right:0;height:48px;background:linear-gradient(transparent,var(--surface));pointer-events:none}
-.card-expand{display:block;width:100%;padding:6px;border:none;background:transparent;font-size:12px;color:var(--accent);cursor:pointer;font-family:var(--font-body);transition:color var(--transition)}.card-expand:hover{color:var(--accent-hover)}
+.card-expand{display:flex;align-items:center;justify-content:center;width:100%;padding:4px;border:none;background:transparent;color:var(--accent);cursor:pointer;transition:color var(--transition)}.card-expand:hover{color:var(--accent-hover)}.card-expand svg{width:18px;height:18px;transition:transform .4s cubic-bezier(.4,0,.2,1)}.card-expand.open svg{transform:rotate(180deg)}
 .card-images{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 14px}
 .card-img-thumb{width:64px;height:64px;border-radius:var(--radius-sm);overflow:hidden;cursor:pointer;border:1px solid var(--border-light);transition:transform var(--transition)}.card-img-thumb:hover{transform:scale(1.05)}
 .card-img-thumb img{width:100%;height:100%;object-fit:cover}
