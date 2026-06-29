@@ -31,6 +31,11 @@ const inputArea = $('inputArea'), dropOverlay = $('dropOverlay'), inputImagesPre
 const historyList = $('historyList'), historyCount = $('historyCount');
 const searchInput = $('searchInput');
 const exportBtn = $('exportBtn'), clearAllBtn = $('clearAllBtn');
+const importBtn = $('importBtn'), importFileInput = $('importFileInput');
+const exportMdBtn = $('exportMdBtn'), trashBtn = $('trashBtn');
+const themeBtn = $('themeBtn'), themeIcon = $('themeIcon');
+const trashModal = $('trashModal'), trashList = $('trashList'), trashEmpty = $('trashEmpty'),
+      closeTrashBtn = $('closeTrashBtn'), closeTrashBtn2 = $('closeTrashBtn2'), emptyTrashBtn = $('emptyTrashBtn');
 const filterBtn = $('filterBtn'), filterLabel = $('filterLabel'), filterDropdown = $('filterDropdown'), filterWrap = $('filterWrap');
 const settingsModal = $('settingsModal'), closeSettingsBtn = $('closeSettingsBtn'),
       cancelSettingsBtn = $('cancelSettingsBtn'), saveSettingsBtn = $('saveSettingsBtn');
@@ -105,7 +110,8 @@ function resolveImageSrc(filename) {
 }
 
 // ===== Utils =====
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+let _uidCounter = 0;
+function uid() { return Date.now().toString(36) + (++_uidCounter).toString(36) + Math.random().toString(36).slice(2, 6); }
 
 function toast(msg, type) {
     const t = document.createElement('div');
@@ -129,7 +135,48 @@ function fmtTime(ts) {
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 function renderMd(text) {
-    try { return marked.parse(text || ''); } catch(e) { return '<p>' + escHtml(text) + '</p>'; }
+    try {
+        var raw = marked.parse(text || '');
+        return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(raw) : raw;
+    } catch(e) { return '<p>' + escHtml(text) + '</p>'; }
+}
+
+// ===== Shared: HTML → Markdown converter =====
+function htmlToMarkdown(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    let result = '';
+    function walk(node) {
+        if (node.nodeType === 3) { result += node.textContent; return; }
+        if (node.nodeType !== 1) return;
+        const tag = node.tagName.toLowerCase();
+        if (tag === 'img') {
+            const src = node.getAttribute('src') || '';
+            const alt = node.getAttribute('alt') || '';
+            if (src) result += '![' + alt + '](' + src + ')';
+        } else if (tag === 'br') { result += '\n'; }
+        else if (/^h[1-6]$/.test(tag)) {
+            result += '\n' + '#'.repeat(parseInt(tag[1])) + ' ';
+            node.childNodes.forEach(walk); result += '\n';
+        } else if (tag === 'p' || tag === 'div' || tag === 'blockquote' || tag === 'li') {
+            node.childNodes.forEach(walk); result += '\n';
+        } else if (tag === 'strong' || tag === 'b') {
+            result += '**'; node.childNodes.forEach(walk); result += '**';
+        } else if (tag === 'em' || tag === 'i') {
+            result += '*'; node.childNodes.forEach(walk); result += '*';
+        } else if (tag === 'code') { result += '`' + node.textContent + '`'; }
+        else if (tag === 'pre') { result += '\n```\n' + node.textContent + '\n```\n'; }
+        else if (tag === 'a') {
+            const href = node.getAttribute('href') || '';
+            const prev = result; result = '';
+            node.childNodes.forEach(walk);
+            const inner = result; result = prev;
+            result += '[' + inner + '](' + href + ')';
+        } else if (tag === 'hr') { result += '\n---\n'; }
+        else { node.childNodes.forEach(walk); }
+    }
+    tmp.childNodes.forEach(walk);
+    return result.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function showConfirm(text) {
@@ -178,8 +225,21 @@ function initLock() {
     }
 }
 
-function tryUnlock() {
-    if (lockPasswordInput.value === settings.password) {
+async function hashPassword(pwd) {
+    const data = new TextEncoder().encode('jian:' + pwd);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function tryUnlock() {
+    const input = lockPasswordInput.value;
+    const inputHash = await hashPassword(input);
+    // Support legacy plaintext passwords: auto-migrate to hash
+    if (inputHash === settings.password || input === settings.password) {
+        if (input === settings.password && settings.password.length !== 64) {
+            settings.password = inputHash;
+            save();
+        }
         lockScreen.classList.add('unlocked');
         localStorage.setItem('jian_unlocked', '1');
     } else {
@@ -374,15 +434,19 @@ function getNoteMode(note) {
 
 function getFilteredList() {
     const q = (searchInput.value || '').trim().toLowerCase();
-    let list = [...notes].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updatedAt - a.updatedAt);
+    let list = notes.filter(n => !n.deleted).sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updatedAt - a.updatedAt);
     if (q) list = list.filter(n => n.content.toLowerCase().includes(q));
     if (currentModeFilter !== 'all') list = list.filter(n => getNoteMode(n) === currentModeFilter);
     return list;
 }
 
+function getDeletedNotes() {
+    return notes.filter(n => n.deleted).sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+}
+
 function renderHistory() {
     const list = getFilteredList();
-    historyCount.textContent = '(' + notes.length + ')';
+    historyCount.textContent = '(' + notes.filter(n => !n.deleted).length + ')';
 
     if (list.length === 0) {
         historyList.innerHTML = (searchInput.value || '').trim()
@@ -544,10 +608,13 @@ function bindHistoryEvents() {
         }
 
         if (target.classList.contains('delete-btn')) {
-            showConfirm('确定删除这条记录？').then(ok => {
+            showConfirm('确定删除这条记录？将移入回收站').then(ok => {
                 if (!ok) return;
-                var deleted = notes.find(n => n.id === id);
-                notes = notes.filter(n => n.id !== id);
+                const n = notes.find(n => n.id === id);
+                if (n) {
+                    n.deleted = true;
+                    n.deletedAt = Date.now();
+                }
                 if (editingId === id) {
                     editingId = null;
                     contentInput.value = '';
@@ -555,17 +622,7 @@ function bindHistoryEvents() {
                 }
                 save();
                 renderHistory();
-                toast('已删除', 'success');
-                // Delete images from repo and cache
-                if (deleted && deleted.images) {
-                    deleted.images.forEach(function(img) {
-                        if (img.startsWith('data:')) return;
-                        repoReadFile('data/images/' + img).then(function(result) {
-                            if (result) return repoDeleteFile('data/images/' + img, result.sha, 'delete ' + img);
-                        }).catch(function() {});
-                        imgCacheDelete(img);
-                    });
-                }
+                toast('已移入回收站', 'success');
                 autoSync();
             });
             return;
@@ -754,42 +811,7 @@ function insertText(text) {
 }
 
 function insertHtmlAsMarkdown(html) {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    let result = '';
-    function walk(node) {
-        if (node.nodeType === 3) { result += node.textContent; }
-        else if (node.nodeType === 1) {
-            const tag = node.tagName.toLowerCase();
-            if (tag === 'img') {
-                const src = node.getAttribute('src') || '';
-                const alt = node.getAttribute('alt') || '';
-                if (src) result += '![' + alt + '](' + src + ')';
-            } else if (tag === 'br') { result += '\n'; }
-            else if (/^h[1-6]$/.test(tag)) {
-                result += '\n' + '#'.repeat(parseInt(tag[1])) + ' ';
-                node.childNodes.forEach(walk); result += '\n';
-            } else if (tag === 'p' || tag === 'div' || tag === 'blockquote' || tag === 'li') {
-                node.childNodes.forEach(walk); result += '\n';
-            } else if (tag === 'strong' || tag === 'b') {
-                result += '**'; node.childNodes.forEach(walk); result += '**';
-            } else if (tag === 'em' || tag === 'i') {
-                result += '*'; node.childNodes.forEach(walk); result += '*';
-            } else if (tag === 'code') { result += '`' + node.textContent + '`'; }
-            else if (tag === 'pre') { result += '\n```\n' + node.textContent + '\n```\n'; }
-            else if (tag === 'a') {
-                const href = node.getAttribute('href') || '';
-                const prev = result; result = '';
-                node.childNodes.forEach(walk);
-                const inner = result; result = prev;
-                result += '[' + inner + '](' + href + ')';
-            } else if (tag === 'hr') { result += '\n---\n'; }
-            else { node.childNodes.forEach(walk); }
-        }
-    }
-    tmp.childNodes.forEach(walk);
-    result = result.replace(/\n{3,}/g, '\n\n').trim();
-    insertText(result);
+    insertText(htmlToMarkdown(html));
 }
 
 // ===== Image Context Menu =====
@@ -861,10 +883,12 @@ document.addEventListener('click', function(e) {
 
 // ===== Export =====
 exportBtn.addEventListener('click', function() {
-    if (notes.length === 0) { toast('没有可导出的记录', 'error'); return; }
-    const data = notes.map(n => ({
+    const active = notes.filter(n => !n.deleted);
+    if (active.length === 0) { toast('没有可导出的记录', 'error'); return; }
+    const data = active.map(n => ({
         content: n.content,
         pinned: n.pinned,
+        images: n.images || [],
         createdAt: n.createdAt,
         updatedAt: n.updatedAt
     }));
@@ -878,17 +902,174 @@ exportBtn.addEventListener('click', function() {
     toast('导出成功', 'success');
 });
 
+// ===== Export Markdown =====
+exportMdBtn.addEventListener('click', function() {
+    const active = notes.filter(n => !n.deleted);
+    if (active.length === 0) { toast('没有可导出的记录', 'error'); return; }
+    if (active.length === 1) {
+        const blob = new Blob([active[0].content], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'jian-' + active[0].id + '.md';
+        a.click();
+        URL.revokeObjectURL(url);
+        toast('导出成功', 'success');
+    } else {
+        let md = '';
+        active.forEach((n, i) => {
+            if (i > 0) md += '\n\n---\n\n';
+            md += n.content;
+        });
+        const blob = new Blob([md], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'jian-all-' + new Date().toISOString().slice(0, 10) + '.md';
+        a.click();
+        URL.revokeObjectURL(url);
+        toast('导出成功', 'success');
+    }
+});
+
+// ===== Import =====
+importBtn.addEventListener('click', function() { importFileInput.click(); });
+importFileInput.addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!Array.isArray(data)) { toast('文件格式错误', 'error'); return; }
+            let count = 0;
+            data.forEach(function(item) {
+                if (!item.content) return;
+                notes.unshift({
+                    id: uid(),
+                    content: item.content,
+                    images: item.images || [],
+                    pinned: !!item.pinned,
+                    createdAt: item.createdAt || Date.now(),
+                    updatedAt: item.updatedAt || Date.now()
+                });
+                count++;
+            });
+            save();
+            currentPage = 1;
+            renderHistory();
+            toast('导入成功，共 ' + count + ' 条', 'success');
+            autoSync();
+        } catch(err) {
+            toast('导入失败：文件解析错误', 'error');
+        }
+    };
+    reader.readAsText(file);
+    this.value = '';
+});
+
+// ===== Recycle Bin =====
+function openTrash() {
+    trashModal.classList.remove('hidden');
+    renderTrash();
+}
+
+function closeTrash() {
+    trashModal.classList.add('hidden');
+}
+
+function renderTrash() {
+    const deleted = getDeletedNotes();
+    trashEmpty.style.display = deleted.length ? 'none' : '';
+    trashList.innerHTML = deleted.map(n =>
+        '<div class="trash-item" data-id="' + n.id + '">' +
+        '<span class="trash-item-content">' + escHtml(n.content.substring(0, 80)) + '</span>' +
+        '<span class="trash-item-time">' + fmtTime(n.deletedAt || n.updatedAt) + '</span>' +
+        '<div class="trash-item-actions">' +
+        '<button class="trash-restore" data-id="' + n.id + '">恢复</button>' +
+        '<button class="trash-delete-permanent" data-id="' + n.id + '">彻底删除</button>' +
+        '</div></div>'
+    ).join('');
+
+    trashList.querySelectorAll('.trash-restore').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const n = notes.find(n => n.id === this.dataset.id);
+            if (n) { delete n.deleted; delete n.deletedAt; }
+            save(); renderTrash(); renderHistory(); autoSync();
+            toast('已恢复', 'success');
+        });
+    });
+
+    trashList.querySelectorAll('.trash-delete-permanent').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+            if (!await showConfirm('彻底删除后无法恢复，确定？')) return;
+            const id = this.dataset.id;
+            const deleted = notes.find(n => n.id === id);
+            notes = notes.filter(n => n.id !== id);
+            if (deleted && deleted.images) {
+                deleted.images.forEach(function(img) {
+                    if (img.startsWith('data:')) return;
+                    repoReadFile('data/images/' + img).then(function(result) {
+                        if (result) return repoDeleteFile('data/images/' + img, result.sha, 'delete ' + img);
+                    }).catch(function() {});
+                    imgCacheDelete(img);
+                });
+            }
+            save(); renderTrash(); renderHistory(); autoSync();
+            toast('已彻底删除', 'success');
+        });
+    });
+}
+
+trashBtn.addEventListener('click', openTrash);
+closeTrashBtn.addEventListener('click', closeTrash);
+closeTrashBtn2.addEventListener('click', closeTrash);
+trashModal.addEventListener('mousedown', function(e) {
+    if (e.target === trashModal) closeTrash();
+});
+
+emptyTrashBtn.addEventListener('click', async function() {
+    const deleted = getDeletedNotes();
+    if (deleted.length === 0) return;
+    if (!await showConfirm('确定清空回收站？共 ' + deleted.length + ' 条记录将被彻底删除')) return;
+    deleted.forEach(function(n) {
+        if (n.images) {
+            n.images.forEach(function(img) {
+                if (img.startsWith('data:')) return;
+                repoReadFile('data/images/' + img).then(function(result) {
+                    if (result) return repoDeleteFile('data/images/' + img, result.sha, 'delete ' + img);
+                }).catch(function() {});
+                imgCacheDelete(img);
+            });
+        }
+    });
+    notes = notes.filter(n => !n.deleted);
+    save(); closeTrash(); renderHistory(); autoSync();
+    toast('回收站已清空', 'success');
+});
+
+// Auto-purge notes deleted > 7 days ago
+(function purgeOldDeleted() {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const old = notes.filter(n => n.deleted && (n.deletedAt || 0) < cutoff);
+    if (old.length) {
+        notes = notes.filter(n => !n.deleted || (n.deletedAt || 0) >= cutoff);
+        save();
+    }
+})();
+
 // ===== Clear All =====
 clearAllBtn.addEventListener('click', async function() {
-    if (notes.length === 0) { toast('没有可清空的记录', 'error'); return; }
-    if (await showConfirm('确定要清空所有记录吗？此操作不可恢复！')) {
-        notes = [];
+    const active = notes.filter(n => !n.deleted);
+    if (active.length === 0) { toast('没有可清空的记录', 'error'); return; }
+    if (await showConfirm('确定要清空所有 ' + active.length + ' 条记录吗？将移入回收站')) {
+        active.forEach(n => { n.deleted = true; n.deletedAt = Date.now(); });
         editingId = null;
         contentInput.value = '';
         editingBadge.classList.remove('visible');
         save();
         renderHistory();
-        toast('已清空所有记录', 'success');
+        toast('已全部移入回收站', 'success');
         autoSync();
     }
 });
@@ -987,15 +1168,18 @@ $('cancelPwdBtn').addEventListener('click', function() {
     $('pwdForm').classList.add('hidden');
 });
 
-$('savePwdBtn').addEventListener('click', function() {
+$('savePwdBtn').addEventListener('click', async function() {
     const msg = $('pwdMsg');
     const isNew = !settings.password;
     const current = $('currentPwdInput').value;
     const np = $('newPwdInput').value;
     const cp = $('confirmPwdInput').value;
 
-    if (!isNew && current !== settings.password) {
-        msg.textContent = '当前密码错误'; msg.className = 'pwd-msg error visible'; return;
+    if (!isNew) {
+        const currentHash = await hashPassword(current);
+        if (currentHash !== settings.password && current !== settings.password) {
+            msg.textContent = '当前密码错误'; msg.className = 'pwd-msg error visible'; return;
+        }
     }
     if (!np) {
         msg.textContent = '请输入新密码'; msg.className = 'pwd-msg error visible'; return;
@@ -1003,7 +1187,7 @@ $('savePwdBtn').addEventListener('click', function() {
     if (np !== cp) {
         msg.textContent = '两次密码不一致'; msg.className = 'pwd-msg error visible'; return;
     }
-    settings.password = np;
+    settings.password = await hashPassword(np);
     save();
     updatePasswordUI();
     toast('密码已保存', 'success');
@@ -1355,59 +1539,7 @@ contentInput.addEventListener('paste', function(e) {
     if (!html) return;
 
     e.preventDefault();
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-
-    let result = '';
-    function walk(node) {
-        if (node.nodeType === 3) {
-            result += node.textContent;
-        } else if (node.nodeType === 1) {
-            const tag = node.tagName.toLowerCase();
-            if (tag === 'img') {
-                const src = node.getAttribute('src') || '';
-                const alt = node.getAttribute('alt') || '';
-                if (src) result += '![' + alt + '](' + src + ')';
-            } else if (tag === 'br') {
-                result += '\n';
-            } else if (/^h[1-6]$/.test(tag)) {
-                const level = parseInt(tag[1]);
-                result += '\n' + '#'.repeat(level) + ' ';
-                node.childNodes.forEach(walk);
-                result += '\n';
-            } else if (tag === 'p' || tag === 'div' || tag === 'blockquote' || tag === 'li') {
-                node.childNodes.forEach(walk);
-                result += '\n';
-            } else if (tag === 'strong' || tag === 'b') {
-                result += '**';
-                node.childNodes.forEach(walk);
-                result += '**';
-            } else if (tag === 'em' || tag === 'i') {
-                result += '*';
-                node.childNodes.forEach(walk);
-                result += '*';
-            } else if (tag === 'code') {
-                result += '`' + node.textContent + '`';
-            } else if (tag === 'pre') {
-                result += '\n```\n' + node.textContent + '\n```\n';
-            } else if (tag === 'a') {
-                const href = node.getAttribute('href') || '';
-                let inner = '';
-                const prev = result;
-                result = '';
-                node.childNodes.forEach(walk);
-                inner = result;
-                result = prev;
-                result += '[' + inner + '](' + href + ')';
-            } else if (tag === 'hr') {
-                result += '\n---\n';
-            } else {
-                node.childNodes.forEach(walk);
-            }
-        }
-    }
-    tmp.childNodes.forEach(walk);
-    result = result.replace(/\n{3,}/g, '\n\n').trim();
+    const result = htmlToMarkdown(html);
 
     const s = this.selectionStart, en = this.selectionEnd;
     this.value = this.value.substring(0, s) + result + this.value.substring(en);
@@ -1436,6 +1568,40 @@ window.addEventListener('scroll', function() {
 backToTop.addEventListener('click', function() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 });
+
+// ===== Dark Mode =====
+const THEME_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+const THEME_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    themeIcon.innerHTML = theme === 'dark' ? THEME_SUN : THEME_MOON;
+    // Switch highlight.js theme
+    const lightSheet = $('hljsThemeLight');
+    const darkSheet = $('hljsThemeDark');
+    if (lightSheet && darkSheet) {
+        lightSheet.disabled = theme === 'dark';
+        darkSheet.disabled = theme !== 'dark';
+    }
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    localStorage.setItem('jian_theme', next);
+}
+
+themeBtn.addEventListener('click', toggleTheme);
+
+// Apply saved theme on load
+(function initTheme() {
+    const saved = localStorage.getItem('jian_theme');
+    if (saved) { applyTheme(saved); return; }
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        applyTheme('dark');
+    }
+})();
 
 // ===== Clear cache =====
 $('clearCacheBtn').addEventListener('click', async function() {
@@ -1494,5 +1660,10 @@ document.querySelectorAll('.toolbar-cats, .tool-group').forEach(initDragScroll);
 // ===== Init =====
 initLock();
 renderHistory();
+
+// ===== Service Worker =====
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(function() {});
+}
 
 })();
