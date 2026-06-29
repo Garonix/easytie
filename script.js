@@ -2,16 +2,20 @@
 'use strict';
 
 // ===== Marked setup =====
-marked.setOptions({
-    highlight: function(code, lang) {
-        if (lang && hljs.getLanguage(lang)) {
-            try { return hljs.highlight(code, { language: lang }).value; } catch(e) {}
-        }
-        try { return hljs.highlightAuto(code).value; } catch(e) {}
-        return code;
-    },
+marked.use({
     breaks: true,
-    gfm: true
+    gfm: true,
+    renderer: {
+        code: function(token) {
+            var text = token.text || '';
+            var lang = token.lang || '';
+            if (lang && hljs.getLanguage(lang)) {
+                try { return '<pre><code class="hljs language-' + lang + '">' + hljs.highlight(text, { language: lang }).value + '</code></pre>'; } catch(e) {}
+            }
+            try { return '<pre><code class="hljs">' + hljs.highlightAuto(text).value + '</code></pre>'; } catch(e) {}
+            return '<pre><code>' + text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code></pre>';
+        }
+    }
 });
 
 // ===== DOM refs =====
@@ -43,7 +47,6 @@ let notes = JSON.parse(localStorage.getItem('jian_notes') || '[]');
 let editingId = null;
 let pendingImages = [];
 let settings = JSON.parse(localStorage.getItem('jian_settings') || '{"syncEnabled":false,"githubToken":"","repoName":"","password":""}');
-let currentFilter = '';
 let currentModeFilter = 'all';
 let currentPage = 1;
 const PAGE_SIZE = 5;
@@ -62,65 +65,29 @@ function openImgDb() {
         var req = indexedDB.open(IMG_DB_NAME, 1);
         req.onupgradeneeded = function(e) {
             var db = e.target.result;
-            if (!db.objectStoreNames.contains(IMG_STORE)) {
-                db.createObjectStore(IMG_STORE);
-            }
+            if (!db.objectStoreNames.contains(IMG_STORE)) db.createObjectStore(IMG_STORE);
         };
         req.onsuccess = function(e) { imgDb = e.target.result; resolve(imgDb); };
         req.onerror = function() { reject(req.error); };
     });
 }
 
-function imgCacheGet(key) {
+function idbOp(mode, fn) {
     return new Promise(function(resolve, reject) {
         if (!imgDb) return resolve(null);
-        var tx = imgDb.transaction(IMG_STORE, 'readonly');
-        var req = tx.objectStore(IMG_STORE).get(key);
-        req.onsuccess = function() { resolve(req.result || null); };
-        req.onerror = function() { reject(req.error); };
+        var tx = imgDb.transaction(IMG_STORE, mode);
+        var result = fn(tx.objectStore(IMG_STORE));
+        result.onsuccess = function() { resolve(result.result !== undefined ? result.result : null); };
+        result.onerror = function() { reject(result.error); };
     });
 }
 
-function imgCachePut(key, value) {
-    return new Promise(function(resolve, reject) {
-        if (!imgDb) return resolve();
-        var tx = imgDb.transaction(IMG_STORE, 'readwrite');
-        var req = tx.objectStore(IMG_STORE).put(value, key);
-        req.onsuccess = function() { resolve(); };
-        req.onerror = function() { reject(req.error); };
-    });
-}
-
-function imgCacheDelete(key) {
-    return new Promise(function(resolve, reject) {
-        if (!imgDb) return resolve();
-        var tx = imgDb.transaction(IMG_STORE, 'readwrite');
-        var req = tx.objectStore(IMG_STORE).delete(key);
-        req.onsuccess = function() { resolve(); };
-        req.onerror = function() { reject(req.error); };
-    });
-}
-
-function imgCacheClear() {
-    return new Promise(function(resolve, reject) {
-        if (!imgDb) return resolve();
-        var tx = imgDb.transaction(IMG_STORE, 'readwrite');
-        var req = tx.objectStore(IMG_STORE).clear();
-        req.onsuccess = function() { resolve(); };
-        req.onerror = function() { reject(req.error); };
-    });
-}
+function imgCacheGet(key) { return idbOp('readonly', function(s) { return s.get(key); }); }
+function imgCachePut(key, val) { return idbOp('readwrite', function(s) { return s.put(val, key); }); }
+function imgCacheDelete(key) { return idbOp('readwrite', function(s) { return s.delete(key); }); }
+function imgCacheClear() { return idbOp('readwrite', function(s) { return s.clear(); }); }
 
 // ===== Image helpers =====
-function getImageExt(dataUrl) {
-    var m = dataUrl.match(/data:image\/(\w+)/);
-    return m ? m[1].replace('jpeg', 'jpg') : 'png';
-}
-
-function dataUrlToBase64(dataUrl) {
-    return dataUrl.split(',')[1] || '';
-}
-
 // Resolve image filename to displayable src (from IndexedDB cache)
 function resolveImageSrc(filename) {
     // If it's already a data URL (legacy), return as-is
@@ -173,17 +140,15 @@ function showConfirm(text) {
             confirmOverlay.classList.add('hidden');
             confirmOkBtn.removeEventListener('click', onOk);
             confirmCancelBtn.removeEventListener('click', onCancel);
-            overlayClick.removeEventListener('click', onCancel);
+            confirmOverlay.removeEventListener('click', onOverlay);
             resolve(result);
         }
         function onOk() { cleanup(true); }
         function onCancel() { cleanup(false); }
+        function onOverlay(e) { if (e.target === confirmOverlay) onCancel(); }
         confirmOkBtn.addEventListener('click', onOk);
         confirmCancelBtn.addEventListener('click', onCancel);
-        const overlayClick = confirmOverlay;
-        overlayClick.addEventListener('click', function handler(e) {
-            if (e.target === confirmOverlay) onCancel();
-        });
+        confirmOverlay.addEventListener('click', onOverlay);
     });
 }
 
@@ -267,7 +232,7 @@ document.querySelectorAll('.md-btn[data-action]').forEach(btn => {
             strikethrough: ['~~', '~~'],
             quote: ['> ', ''],
             code: ['`', '`'],
-            codeblock: ['```\n', '\n```'],
+            codeblock: ['```', '\n\n```'],
             ul: ['- ', ''],
             ol: ['1. ', ''],
             task: ['- [ ] ', ''],
@@ -315,7 +280,8 @@ contentInput.addEventListener('input', function() {
 function processPendingImages(noteId, startIdx) {
     var filenames = [];
     var promises = pendingImages.map(function(dataUrl, i) {
-        var ext = getImageExt(dataUrl);
+        var m = dataUrl.match(/data:image\/(\w+)/);
+        var ext = m ? m[1].replace('jpeg', 'jpg') : 'png';
         var filename = noteId + '-' + (startIdx + i) + '.' + ext;
         filenames.push(filename);
         return imgCachePut(filename, dataUrl);
@@ -484,7 +450,7 @@ function renderHistory() {
 }
 
 function resolveCardImages() {
-    document.querySelectorAll('.card-img-thumb').forEach(function(thumb) {
+    historyList.querySelectorAll('.card-img-thumb').forEach(function(thumb) {
         var filename = thumb.dataset.src;
         if (!filename || filename.startsWith('data:')) return;
         resolveImageSrc(filename).then(function(src) {
@@ -992,7 +958,7 @@ saveSettingsBtn.addEventListener('click', function() {
     if (isRepoConfigured()) pullFromRepo();
 });
 
-settingsModal.addEventListener('click', function(e) {
+settingsModal.addEventListener('mousedown', function(e) {
     if (e.target === settingsModal) closeSettings();
 });
 
@@ -1092,9 +1058,9 @@ function repoReadFile(path) {
     });
 }
 
-function repoWriteFile(path, content, sha, message) {
+function repoWriteFile(path, content, sha, message, raw) {
     var [owner, repo] = settings.repoName.split('/');
-    var body = { message: message || 'sync', content: btoa(unescape(encodeURIComponent(content))) };
+    var body = { message: message || 'sync', content: raw ? content : btoa(unescape(encodeURIComponent(content))) };
     if (sha) body.sha = sha;
     return ghApi('/repos/' + owner + '/' + repo + '/contents/' + path, {
         method: 'PUT',
@@ -1146,32 +1112,12 @@ function repoCleanupHistory() {
 }
 
 // ===== Repo image API =====
-function repoWriteImage(path, base64Content, message) {
-    var [owner, repo] = settings.repoName.split('/');
-    return ghApi('/repos/' + owner + '/' + repo + '/contents/' + path, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message || 'upload image', content: base64Content })
-    }).then(function(r) {
-        if (!r.ok) throw new Error('上传图片失败');
-        return r.json();
-    });
-}
-
 function repoDeleteFile(path, sha, message) {
     var [owner, repo] = settings.repoName.split('/');
     return ghApi('/repos/' + owner + '/' + repo + '/contents/' + path, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: message || 'delete file', sha: sha })
-    });
-}
-
-function repoListDir(path) {
-    var [owner, repo] = settings.repoName.split('/');
-    return ghApi('/repos/' + owner + '/' + repo + '/contents/' + path).then(function(r) {
-        if (!r.ok) return [];
-        return r.json();
     });
 }
 
@@ -1193,8 +1139,8 @@ function uploadPendingImages() {
             uploadPromises.push(
                 imgCacheGet(img).then(function(cached) {
                     if (!cached) return; // already in repo or missing
-                    var base64 = dataUrlToBase64(cached);
-                    return repoWriteImage('data/images/' + img, base64, 'upload ' + img).catch(function() {
+                    var base64 = cached.split(',')[1] || '';
+                    return repoWriteFile('data/images/' + img, base64, null, 'upload ' + img, true).catch(function() {
                         // File might already exist, ignore
                     });
                 })
@@ -1204,48 +1150,12 @@ function uploadPendingImages() {
     return Promise.all(uploadPromises);
 }
 
-// Delete orphan images from repo (images in repo but not referenced by any note)
-function cleanupRepoImages() {
-    var referencedFiles = new Set();
-    notes.forEach(function(n) {
-        (n.images || []).forEach(function(img) {
-            if (!img.startsWith('data:')) referencedFiles.add(img);
-        });
-    });
-
-    return repoListDir('data/images').then(function(files) {
-        if (!Array.isArray(files)) return;
-        var deletePromises = files.filter(function(f) {
-            return !referencedFiles.has(f.name);
-        }).map(function(f) {
-            return repoDeleteFile(f.path, f.sha, 'cleanup ' + f.name).then(function() {
-                return imgCacheDelete(f.name);
-            }).catch(function() {});
-        });
-        return Promise.all(deletePromises);
-    }).catch(function() {});
-}
-
 // ===== Sync: push local to remote =====
 function pushToRepo() {
     if (!isRepoConfigured() || syncing) return Promise.resolve();
     syncing = true;
     syncBtn.classList.add('sync-spin');
-
-    // Strip base64 from notes for clean JSON
-    var cleanNotes = notes.map(function(n) {
-        return {
-            id: n.id,
-            content: n.content,
-            images: (n.images || []).map(function(img) {
-                return img.startsWith('data:') ? img : img; // filenames stay as-is
-            }),
-            pinned: n.pinned,
-            createdAt: n.createdAt,
-            updatedAt: n.updatedAt
-        };
-    });
-    var content = JSON.stringify(cleanNotes, null, 2);
+    var content = JSON.stringify(notes, null, 2);
 
     return uploadPendingImages().then(function() {
         return repoReadFile(DATA_PATH);
@@ -1306,33 +1216,25 @@ function cacheRemoteImages(notesList) {
             if (!img.startsWith('data:')) filenames.add(img);
         });
     });
+    var [owner, repo] = settings.repoName.split('/');
     var promises = [];
     filenames.forEach(function(filename) {
         promises.push(
             imgCacheGet(filename).then(function(cached) {
-                if (cached) return; // already cached
-                // Download from repo
-                return repoReadFile('data/images/' + filename).then(function(result) {
-                    if (result) {
-                        // result.content is the decoded text, but for images we need the raw base64
-                        // repoReadFile uses atob which breaks binary. Use ghApi directly.
-                        var [owner, repo] = settings.repoName.split('/');
-                        return ghApi('/repos/' + owner + '/' + repo + '/contents/data/images/' + filename).then(function(r) {
-                            if (!r.ok) return;
-                            return r.json().then(function(data) {
-                                var ext = filename.split('.').pop();
-                                var mime = ext === 'jpg' ? 'image/jpeg' : 'image/' + ext;
-                                var dataUrl = 'data:' + mime + ';base64,' + data.content.replace(/\n/g, '');
-                                return imgCachePut(filename, dataUrl);
-                            });
-                        });
-                    }
+                if (cached) return;
+                return ghApi('/repos/' + owner + '/' + repo + '/contents/data/images/' + filename).then(function(r) {
+                    if (!r.ok) return;
+                    return r.json().then(function(data) {
+                        var ext = filename.split('.').pop();
+                        var mime = ext === 'jpg' ? 'image/jpeg' : 'image/' + ext;
+                        var dataUrl = 'data:' + mime + ';base64,' + data.content.replace(/\n/g, '');
+                        return imgCachePut(filename, dataUrl);
+                    });
                 });
             }).catch(function() {})
         );
     });
     return Promise.all(promises).then(function() {
-        // Re-render to show newly cached images
         renderHistory();
     });
 }
