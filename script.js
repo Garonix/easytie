@@ -1087,7 +1087,8 @@ clearAllBtn.addEventListener('click', async function() {
         save();
         renderHistory();
         toast('已全部移入回收站', 'success');
-        autoSync();
+        clearTimeout(syncTimer);
+        pushToRepo(true);
     }
 });
 
@@ -1355,8 +1356,9 @@ function uploadPendingImages() {
 }
 
 // ===== Sync: push local to remote =====
-function pushToRepo(retries) {
-    if (!isRepoConfigured() || syncing) return Promise.resolve();
+function pushToRepo(force, retries) {
+    if (!isRepoConfigured()) return Promise.resolve();
+    if (!force && syncing) return Promise.resolve();
     retries = retries || 0;
     syncing = true;
     syncBtn.classList.add('sync-spin');
@@ -1368,9 +1370,10 @@ function pushToRepo(retries) {
         var sha = result ? result.sha : null;
         return repoWriteFile(DATA_PATH, content, sha, 'sync notes');
     }).then(function(r) {
-        if (r.status === 409 && retries < 2) {
-            // SHA conflict — re-read and retry
-            return pushToRepo(retries + 1);
+        if (r.status === 409 && retries < 3) {
+            return new Promise(function(resolve) {
+                setTimeout(resolve, 500 * (retries + 1));
+            }).then(function() { return pushToRepo(force, retries + 1); });
         }
         if (!r.ok) throw new Error('写入失败 (' + r.status + ')');
         return repoGetCommitCount(DATA_PATH);
@@ -1461,7 +1464,7 @@ function fullSync() {
     if (!isRepoConfigured()) { toast('请先配置仓库', 'error'); return; }
     clearTimeout(syncTimer);
     syncBtn.classList.add('sync-spin');
-    pushToRepo().then(function() {
+    pushToRepo(true).then(function() {
         return pullFromRepo();
     }).then(function() {
         syncBtn.classList.remove('sync-spin');
