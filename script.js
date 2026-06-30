@@ -470,7 +470,6 @@ function renderHistory() {
         card.className = 'history-card' + (note.pinned ? ' pinned' : '');
         card.style.animationDelay = (i * 0.03) + 's';
 
-        const preview = note.content.length > 300 ? note.content.substring(0, 300) + '…' : note.content;
         const hasMore = note.content.length > 300;
 
         let imgsHtml = '';
@@ -498,13 +497,13 @@ function renderHistory() {
                     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
                 '</button>' +
                 '<button class="card-action md-export-btn" data-id="' + note.id + '" title="导出 Markdown">' +
-                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' +
+                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>' +
                 '</button>' +
                 '<button class="card-action danger delete-btn" data-id="' + note.id + '" title="删除">' +
                     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
                 '</button>' +
             '</div></div>' +
-            '<div class="card-content markdown-body">' + renderMd(preview) + '</div>' +
+            '<div class="card-content markdown-body">' + renderMd(note.content) + '</div>' +
             (hasMore ? '<button class="card-expand expand-btn" data-id="' + note.id + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>' : '') +
             imgsHtml;
 
@@ -635,15 +634,44 @@ function bindHistoryEvents() {
             const btn = target.closest('.expand-btn') || target;
             const card = btn.closest('.history-card');
             const content = card.querySelector('.card-content');
-            const n = notes.find(n => n.id === id);
             if (content.classList.contains('expanded')) {
+                // Collapse: animate from current height to 200px
+                const from = content.scrollHeight + 'px';
                 content.classList.remove('expanded');
-                content.innerHTML = renderMd(n.content.substring(0, 300) + '…');
                 btn.classList.remove('open');
+                content.style.maxHeight = '200px';
+                content.animate(
+                    [{ maxHeight: from }, { maxHeight: '200px' }],
+                    { duration: 450, easing: 'cubic-bezier(.4,0,.2,1)' }
+                );
             } else {
+                // Expand: animate from 200px to full height, then remove cap
+                const to = content.scrollHeight;
                 content.classList.add('expanded');
-                content.innerHTML = renderMd(n.content);
                 btn.classList.add('open');
+                content.style.maxHeight = to + 'px';
+                content.animate(
+                    [{ maxHeight: '200px' }, { maxHeight: to + 'px' }],
+                    { duration: 450, easing: 'cubic-bezier(.4,0,.2,1)' }
+                ).onfinish = function() {
+                    content.style.maxHeight = 'none';
+                    requestAnimationFrame(function() {
+                        var targetY = card.getBoundingClientRect().top + window.scrollY - 72;
+                        var maxScroll = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+                        targetY = Math.min(targetY, maxScroll);
+                        var startY = window.scrollY;
+                        var diff = targetY - startY;
+                        if (Math.abs(diff) < 2) return;
+                        var start = null;
+                        (function step(ts) {
+                            if (!start) start = ts;
+                            var p = Math.min((ts - start) / 350, 1);
+                            var ease = p < 0.5 ? 4*p*p*p : 1 - Math.pow(-2*p+2,3)/2;
+                            window.scrollTo(0, startY + diff * ease);
+                            if (p < 1) requestAnimationFrame(step);
+                        })(start);
+                    });
+                };
             }
             return;
         }
@@ -1226,7 +1254,10 @@ function repoReadFile(path) {
     return ghApi('/repos/' + owner + '/' + repo + '/contents/' + path).then(function(r) {
         if (!r.ok) return null;
         return r.json().then(function(data) {
-            return { content: atob(data.content.replace(/\n/g, '')), sha: data.sha };
+            var raw = atob(data.content.replace(/\n/g, ''));
+            var bytes = new Uint8Array(raw.length);
+            for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+            return { content: new TextDecoder('utf-8').decode(bytes), sha: data.sha };
         });
     });
 }
@@ -1324,8 +1355,9 @@ function uploadPendingImages() {
 }
 
 // ===== Sync: push local to remote =====
-function pushToRepo() {
+function pushToRepo(retries) {
     if (!isRepoConfigured() || syncing) return Promise.resolve();
+    retries = retries || 0;
     syncing = true;
     syncBtn.classList.add('sync-spin');
     var content = JSON.stringify(notes, null, 2);
@@ -1336,7 +1368,11 @@ function pushToRepo() {
         var sha = result ? result.sha : null;
         return repoWriteFile(DATA_PATH, content, sha, 'sync notes');
     }).then(function(r) {
-        if (!r.ok) throw new Error('写入失败');
+        if (r.status === 409 && retries < 2) {
+            // SHA conflict — re-read and retry
+            return pushToRepo(retries + 1);
+        }
+        if (!r.ok) throw new Error('写入失败 (' + r.status + ')');
         return repoGetCommitCount(DATA_PATH);
     }).then(function(count) {
         if (count > MAX_COMMITS) {
@@ -1345,7 +1381,6 @@ function pushToRepo() {
     }).then(function() {
         syncing = false;
         syncBtn.classList.remove('sync-spin');
-        // If changes arrived during push, push again
         if (pendingSync) {
             pendingSync = false;
             pushToRepo();
@@ -1354,7 +1389,6 @@ function pushToRepo() {
         syncing = false;
         syncBtn.classList.remove('sync-spin');
         console.error('push failed:', err);
-        // Retry on failure too
         if (pendingSync) {
             pendingSync = false;
             autoSync();
