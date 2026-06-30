@@ -1087,8 +1087,18 @@ clearAllBtn.addEventListener('click', async function() {
         save();
         renderHistory();
         toast('已全部移入回收站', 'success');
-        clearTimeout(syncTimer);
-        pushToRepo(true);
+        if (isRepoConfigured() && !syncing) {
+            syncing = true;
+            setSyncingUI(true);
+            doPush().then(function() {
+                syncing = false;
+                setSyncingUI(false);
+            }).catch(function(err) {
+                syncing = false;
+                setSyncingUI(false);
+                console.error('clear push failed:', err);
+            });
+        }
     }
 });
 
@@ -1362,12 +1372,9 @@ function setSyncingUI(on) {
     syncBtn.classList.toggle('sync-spin', on);
 }
 
-function pushToRepo(force, retries) {
-    if (!isRepoConfigured()) return Promise.resolve();
-    if (!force && syncing) return Promise.resolve();
+// Core push — does NOT touch UI or syncing flag (caller manages those)
+function doPush(retries) {
     retries = retries || 0;
-    syncing = true;
-    setSyncingUI(true);
     var content = JSON.stringify(notes, null, 2);
 
     return uploadPendingImages().then(function() {
@@ -1380,7 +1387,7 @@ function pushToRepo(force, retries) {
             if (r.status === 409 && retries < 3) {
                 return new Promise(function(resolve) {
                     setTimeout(resolve, 500 * (retries + 1));
-                }).then(function() { return pushToRepo(force, retries + 1); });
+                }).then(function() { return doPush(retries + 1); });
             }
             throw new Error('写入失败 (' + (r.status || '网络错误') + ')');
         }
@@ -1389,21 +1396,24 @@ function pushToRepo(force, retries) {
         if (count > MAX_COMMITS) {
             return repoCleanupHistory();
         }
-    }).then(function() {
+    });
+}
+
+// Auto-sync push — manages own UI, skips if already syncing
+function pushToRepo() {
+    if (!isRepoConfigured() || syncing) return Promise.resolve();
+    syncing = true;
+    setSyncingUI(true);
+
+    return doPush().then(function() {
         syncing = false;
         setSyncingUI(false);
-        if (!force && pendingSync) {
-            pendingSync = false;
-            pushToRepo();
-        }
+        if (pendingSync) { pendingSync = false; pushToRepo(); }
     }).catch(function(err) {
         syncing = false;
         setSyncingUI(false);
         console.error('push failed:', err);
-        if (!force && pendingSync) {
-            pendingSync = false;
-            autoSync();
-        }
+        if (pendingSync) { pendingSync = false; autoSync(); }
     });
 }
 
@@ -1413,13 +1423,9 @@ function mergeNotes(local, remote) {
     local.forEach(function(n) { map[n.id] = n; });
     remote.forEach(function(n) {
         if (!map[n.id]) {
-            // Remote has a note we don't — add it
             map[n.id] = n;
-        } else {
-            // Both have it — keep the newer one
-            if ((n.updatedAt || 0) >= (map[n.id].updatedAt || 0)) {
-                map[n.id] = n;
-            }
+        } else if ((n.updatedAt || 0) >= (map[n.id].updatedAt || 0)) {
+            map[n.id] = n;
         }
     });
     return Object.values(map);
@@ -1429,16 +1435,14 @@ function pullFromRepo() {
     if (!isRepoConfigured()) return Promise.resolve();
     return repoReadFile(DATA_PATH).then(function(result) {
         if (result) {
-            try {
-                var remote = JSON.parse(result.content);
-                if (Array.isArray(remote)) {
-                    notes = mergeNotes(notes, remote);
-                    save();
-                    currentPage = 1;
-                    renderHistory();
-                    return cacheRemoteImages(remote);
-                }
-            } catch(e) {}
+            var remote = JSON.parse(result.content);
+            if (Array.isArray(remote)) {
+                notes = mergeNotes(notes, remote);
+                save();
+                currentPage = 1;
+                renderHistory();
+                return cacheRemoteImages(remote);
+            }
         }
     });
 }
@@ -1486,15 +1490,19 @@ function autoSync() {
 // ===== Full sync: cancel debounce → push → pull → final push if pending =====
 function fullSync() {
     if (!isRepoConfigured()) { toast('请先配置仓库', 'error'); return; }
+    if (syncing) return;
     clearTimeout(syncTimer);
     syncing = true;
+    pendingSync = false;
     setSyncingUI(true);
-    pushToRepo(true).then(function() {
+
+    doPush().then(function() {
         return pullFromRepo();
     }).then(function() {
+        // If changes arrived during sync, push them too
         if (pendingSync) {
             pendingSync = false;
-            return pushToRepo(true);
+            return doPush();
         }
     }).then(function() {
         syncing = false;
@@ -1503,6 +1511,7 @@ function fullSync() {
     }).catch(function(err) {
         syncing = false;
         setSyncingUI(false);
+        console.error('sync failed:', err);
         toast(err.message || '同步失败', 'error');
     });
 }
