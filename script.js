@@ -1386,7 +1386,7 @@ function pushToRepo(force, retries) {
     }).then(function() {
         syncing = false;
         syncBtn.classList.remove('sync-spin');
-        if (pendingSync) {
+        if (!force && pendingSync) {
             pendingSync = false;
             pushToRepo();
         }
@@ -1394,7 +1394,7 @@ function pushToRepo(force, retries) {
         syncing = false;
         syncBtn.classList.remove('sync-spin');
         console.error('push failed:', err);
-        if (pendingSync) {
+        if (!force && pendingSync) {
             pendingSync = false;
             autoSync();
         }
@@ -1461,13 +1461,18 @@ function autoSync() {
     syncTimer = setTimeout(pushToRepo, 2000);
 }
 
-// ===== Full sync: cancel debounce → push → pull =====
+// ===== Full sync: cancel debounce → push → pull → final push if pending =====
 function fullSync() {
     if (!isRepoConfigured()) { toast('请先配置仓库', 'error'); return; }
     clearTimeout(syncTimer);
     syncBtn.classList.add('sync-spin');
     pushToRepo(true).then(function() {
         return pullFromRepo();
+    }).then(function() {
+        if (pendingSync) {
+            pendingSync = false;
+            return pushToRepo(true);
+        }
     }).then(function() {
         syncBtn.classList.remove('sync-spin');
         toast('同步完成', 'success');
