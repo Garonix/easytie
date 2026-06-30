@@ -145,7 +145,8 @@ body{font-family:var(--font-body);font-weight:400;color:var(--text);background:v
 .attach-btn svg,.fullscreen-btn svg{width:17px;height:17px;pointer-events:none}
 .save-btn{padding:8px 28px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-family:var(--font-body);font-weight:500;cursor:pointer;transition:all var(--transition);-webkit-tap-highlight-color:transparent}
 .save-btn:hover{background:var(--accent-hover);transform:translateY(-1px)}.save-btn:active{transform:none}
-.save-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.save-btn:disabled,.save-btn[disabled]{opacity:.4;cursor:not-allowed;transform:none;pointer-events:none}
+.icon-btn:disabled,.icon-btn[disabled]{opacity:.35;cursor:not-allowed;pointer-events:none}
 
 /* fullscreen */
 .editor-section.fullscreen{position:fixed;inset:0;z-index:500;margin:0;padding:0;background:var(--surface);animation:fadeIn .2s ease}

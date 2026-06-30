@@ -1356,12 +1356,18 @@ function uploadPendingImages() {
 }
 
 // ===== Sync: push local to remote =====
+function setSyncingUI(on) {
+    syncBtn.disabled = on;
+    saveBtn.disabled = on;
+    syncBtn.classList.toggle('sync-spin', on);
+}
+
 function pushToRepo(force, retries) {
     if (!isRepoConfigured()) return Promise.resolve();
     if (!force && syncing) return Promise.resolve();
     retries = retries || 0;
     syncing = true;
-    syncBtn.classList.add('sync-spin');
+    setSyncingUI(true);
     var content = JSON.stringify(notes, null, 2);
 
     return uploadPendingImages().then(function() {
@@ -1385,14 +1391,14 @@ function pushToRepo(force, retries) {
         }
     }).then(function() {
         syncing = false;
-        syncBtn.classList.remove('sync-spin');
+        setSyncingUI(false);
         if (!force && pendingSync) {
             pendingSync = false;
             pushToRepo();
         }
     }).catch(function(err) {
         syncing = false;
-        syncBtn.classList.remove('sync-spin');
+        setSyncingUI(false);
         console.error('push failed:', err);
         if (!force && pendingSync) {
             pendingSync = false;
@@ -1402,6 +1408,23 @@ function pushToRepo(force, retries) {
 }
 
 // ===== Sync: pull remote to local =====
+function mergeNotes(local, remote) {
+    var map = {};
+    local.forEach(function(n) { map[n.id] = n; });
+    remote.forEach(function(n) {
+        if (!map[n.id]) {
+            // Remote has a note we don't — add it
+            map[n.id] = n;
+        } else {
+            // Both have it — keep the newer one
+            if ((n.updatedAt || 0) >= (map[n.id].updatedAt || 0)) {
+                map[n.id] = n;
+            }
+        }
+    });
+    return Object.values(map);
+}
+
 function pullFromRepo() {
     if (!isRepoConfigured()) return Promise.resolve();
     return repoReadFile(DATA_PATH).then(function(result) {
@@ -1409,11 +1432,10 @@ function pullFromRepo() {
             try {
                 var remote = JSON.parse(result.content);
                 if (Array.isArray(remote)) {
-                    notes = remote;
+                    notes = mergeNotes(notes, remote);
                     save();
                     currentPage = 1;
                     renderHistory();
-                    // Download and cache any images not in IndexedDB
                     return cacheRemoteImages(remote);
                 }
             } catch(e) {}
@@ -1465,7 +1487,8 @@ function autoSync() {
 function fullSync() {
     if (!isRepoConfigured()) { toast('请先配置仓库', 'error'); return; }
     clearTimeout(syncTimer);
-    syncBtn.classList.add('sync-spin');
+    syncing = true;
+    setSyncingUI(true);
     pushToRepo(true).then(function() {
         return pullFromRepo();
     }).then(function() {
@@ -1474,10 +1497,12 @@ function fullSync() {
             return pushToRepo(true);
         }
     }).then(function() {
-        syncBtn.classList.remove('sync-spin');
+        syncing = false;
+        setSyncingUI(false);
         toast('同步完成', 'success');
     }).catch(function(err) {
-        syncBtn.classList.remove('sync-spin');
+        syncing = false;
+        setSyncingUI(false);
         toast(err.message || '同步失败', 'error');
     });
 }
