@@ -1272,8 +1272,8 @@ function repoWriteFile(path, content, sha, message, raw) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
     }).then(function(r) {
-        if (!r.ok) throw new Error('写入失败');
-        return r.json();
+        if (!r.ok) return { ok: false, status: r.status };
+        return r.json().then(function(data) { return { ok: true, status: r.status, data: data }; });
     });
 }
 
@@ -1370,12 +1370,14 @@ function pushToRepo(force, retries) {
         var sha = result ? result.sha : null;
         return repoWriteFile(DATA_PATH, content, sha, 'sync notes');
     }).then(function(r) {
-        if (r.status === 409 && retries < 3) {
-            return new Promise(function(resolve) {
-                setTimeout(resolve, 500 * (retries + 1));
-            }).then(function() { return pushToRepo(force, retries + 1); });
+        if (!r.ok) {
+            if (r.status === 409 && retries < 3) {
+                return new Promise(function(resolve) {
+                    setTimeout(resolve, 500 * (retries + 1));
+                }).then(function() { return pushToRepo(force, retries + 1); });
+            }
+            throw new Error('写入失败 (' + (r.status || '网络错误') + ')');
         }
-        if (!r.ok) throw new Error('写入失败 (' + r.status + ')');
         return repoGetCommitCount(DATA_PATH);
     }).then(function(count) {
         if (count > MAX_COMMITS) {
